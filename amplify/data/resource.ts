@@ -1,11 +1,12 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { postConfirmation } from '../auth/post-confirmation/resource';
 
 const schema = a.schema({
   User: a.model({
     name: a.string().required(),
     email: a.string().required(),
     role: a.string(),
-    walletBalance: a.float().required(), // Stores credits / debits
+    walletBalance: a.float().required(),
     teams: a.hasMany('TeamMember', 'userId'),
     payments: a.hasMany('Payment', 'userId'),
     rsvps: a.hasMany('RSVP', 'userId'),
@@ -30,8 +31,8 @@ const schema = a.schema({
     location: a.string().required(),
     organizerId: a.id().required(),
     maxPlayers: a.integer().required(),
-    appFee: a.float().required(), // Total upfront fee ($1.99 or $2.99)
-    minimumBalanceRequired: a.float().required(), // Minimum wallet balance for player to join
+    appFee: a.float().required(),
+    minimumBalanceRequired: a.float().required(),
     teamId: a.id(),
     team: a.belongsTo('Team', 'teamId'),
     rsvps: a.hasMany('RSVP', 'gameId'),
@@ -43,7 +44,7 @@ const schema = a.schema({
   }).authorization(allow => [allow.publicApiKey()]),
 
   RSVP: a.model({
-    status: a.string().required(), // 'Going', 'Not Going'
+    status: a.string().required(),
     gameId: a.id().required(),
     userId: a.id().required(),
     game: a.belongsTo('Game', 'gameId'),
@@ -52,12 +53,16 @@ const schema = a.schema({
 
   Payment: a.model({
     amount: a.float().required(),
-    type: a.string().required(), // 'Organizer Fee Debit', 'Player Fee Share', 'Organizer Reimbursement'
-    status: a.string().required(), // 'Completed', 'Pending'
+    type: a.string().required(),
+    status: a.string().required(),
     userId: a.id().required(),
     user: a.belongsTo('User', 'userId'),
   }).authorization(allow => [allow.publicApiKey()]),
-});
+})
+  // Attach the Lambda function access at the ROOT schema level, not inside the models
+  .authorization(allow => [
+    allow.resource(postConfirmation)
+  ]);
 
 export type Schema = ClientSchema<typeof schema>;
 
