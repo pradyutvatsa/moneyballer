@@ -129,29 +129,39 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                     _selectedDate != null &&
                     _selectedTime != null) {
                   final int maxPlayers = int.parse(_maxPlayersController.text);
-                  // Calculate the upfront organizer float fee based on session size[cite: 1]
                   final double fee = maxPlayers <= 10 ? 1.99 : 2.99;
 
                   try {
-                    // 1. Fetch the authenticated Cognito User
+                    // 1. Fetch current authenticated Cognito User
                     final authUser = await Amplify.Auth.getCurrentUser();
                     final userId = authUser.userId;
 
-                    // 2. Fetch the Organizer's current wallet balance from DynamoDB
-                    final userRequest = ModelQueries.list(
+                    // 2. Fetch the Organizer directly by primary key
+                    final userRequest = ModelQueries.get(
                       User.classType,
-                      where: User.ID.eq(userId),
+                      UserModelIdentifier(id: userId),
                     );
                     final userResponse = await Amplify.API
                         .query(request: userRequest)
                         .response;
-                    final users = userResponse.data?.items;
+                    final organizer = userResponse.data;
 
-                    if (users == null || users.isEmpty || users.first == null) {
-                      safePrint('Organizer profile not found in DynamoDB.');
+                    if (organizer == null) {
+                      safePrint(
+                        'Organizer profile not found in DynamoDB for ID: $userId',
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'User profile not found in database.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                       return;
                     }
-                    final organizer = users.first!;
 
                     // 3. Verify sufficient funds
                     if (organizer.walletBalance < fee) {
@@ -168,7 +178,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                       return;
                     }
 
-                    // 4. Deduct the upfront fee from the organizer's wallet[cite: 1]
+                    // 4. Deduct upfront fee from organizer's wallet
                     final updatedOrganizer = organizer.copyWith(
                       walletBalance: organizer.walletBalance - fee,
                     );
@@ -178,18 +188,18 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                         )
                         .response;
 
-                    // 5. Generate the Payment receipt using the full user object[cite: 5]
+                    // 5. Generate Payment receipt
                     final payment = Payment(
                       amount: fee,
                       type: 'Organizer Fee Debit',
                       status: 'Completed',
-                      user: organizer,
+                      user: updatedOrganizer,
                     );
                     await Amplify.API
                         .mutate(request: ModelMutations.create(payment))
                         .response;
 
-                    // 6. Schedule the Game[cite: 1]
+                    // 6. Schedule Game
                     final combinedDateTime = DateTime(
                       _selectedDate!.year,
                       _selectedDate!.month,

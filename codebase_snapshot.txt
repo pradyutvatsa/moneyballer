@@ -1,0 +1,4265 @@
+
+=== FILE: lib/features/scheduling/dashboard_screen.dart ===
+
+import 'package:flutter/material.dart';
+import 'package:amplify_authenticator/amplify_authenticator.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_api/amplify_api.dart';
+import 'package:moneyballer/models/ModelProvider.dart';
+import 'package:moneyballer/features/scheduling/create_game_screen.dart';
+
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  List<Game> _games = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchGames();
+  }
+
+  Future<void> _fetchGames() async {
+    try {
+      if (!mounted) return;
+      setState(() => _isLoading = true);
+
+      final request = ModelQueries.list(Game.classType);
+      final response = await Amplify.API.query(request: request).response;
+
+      if (response.hasErrors) {
+        safePrint('GraphQL Query errors: ${response.errors}');
+      }
+
+      final items = response.data?.items;
+      safePrint('Raw items received: ${items?.length}');
+
+      if (items != null) {
+        final fetchedGames = items.whereType<Game>().toList();
+        safePrint('Parsed ${fetchedGames.length} valid games!');
+
+        if (mounted) {
+          setState(() {
+            _games = List<Game>.from(fetchedGames);
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _games = [];
+            _isLoading = false;
+          });
+        }
+      }
+    } on ApiException catch (e) {
+      safePrint('Query failed: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[200],
+      appBar: AppBar(
+        title: const Text(
+          'MoneyBaller',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+        ),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        actions: const [SignOutButton()],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.black))
+          : RefreshIndicator(
+              onRefresh: _fetchGames,
+              color: Colors.black,
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  const Text(
+                    'Upcoming Games',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  if (_games.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 40.0),
+                      child: Center(
+                        child: Text(
+                          'No games scheduled yet.',
+                          style: TextStyle(fontSize: 20, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  for (final game in _games) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildEventCard(
+                        title: 'Game (${game.maxPlayers} Max)',
+                        date:
+                            '${game.date.format()} at ${game.time.format().substring(0, 5)}',
+                        location: game.location,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (context) => const CreateGameScreen()),
+          );
+          await _fetchGames();
+        },
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add, size: 28),
+        label: const Text(
+          'Create Game',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventCard({
+    required String title,
+    required String date,
+    required String location,
+  }) {
+    return Card(
+      elevation: 6,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today,
+                  size: 24,
+                  color: Colors.black87,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  date,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 24, color: Colors.black87),
+                const SizedBox(width: 12),
+                Text(
+                  location,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+=== FILE: lib/features/scheduling/event_details_screen.dart ===
+
+import 'package:flutter/material.dart';
+import 'package:amplify_api/amplify_api.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:moneyballer/models/ModelProvider.dart';
+
+class EventDetailsScreen extends StatelessWidget {
+  final Game game;
+
+  const EventDetailsScreen({super.key, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[200],
+      appBar: AppBar(
+        title: const Text(
+          'Event Details',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24.0),
+        children: [
+          Text(
+            'Game (${game.maxPlayers} Max)',
+            style: const TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          _buildInfoRow(Icons.calendar_today, game.date.format()),
+          const SizedBox(height: 16),
+
+          _buildInfoRow(Icons.access_time, game.time.format().substring(0, 5)),
+          const SizedBox(height: 16),
+
+          _buildInfoRow(Icons.location_on, game.location),
+          const SizedBox(height: 40),
+
+          const Text(
+            'RSVP Status',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // RSVP Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    final double playerShare = game.maxPlayers > 0
+                        ? (game.appFee) / game.maxPlayers
+                        : 0.0;
+
+                    try {
+                      final authUser = await Amplify.Auth.getCurrentUser();
+                      final userId = authUser.userId;
+
+                      final playerRequest = ModelQueries.list(
+                        User.classType,
+                        where: User.ID.eq(userId),
+                      );
+                      final playerResponse = await Amplify.API
+                          .query(request: playerRequest)
+                          .response;
+                      final players = playerResponse.data?.items;
+
+                      if (players == null || players.isEmpty) return;
+                      final player = players.first;
+                      if (player == null) return;
+
+                      if (player.walletBalance < playerShare) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Insufficient funds. Top up \$$playerShare',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      final updatedPlayer = player.copyWith(
+                        walletBalance: player.walletBalance - playerShare,
+                      );
+                      await Amplify.API
+                          .mutate(request: ModelMutations.update(updatedPlayer))
+                          .response;
+
+                      final orgRequest = ModelQueries.list(
+                        User.classType,
+                        where: User.ID.eq(game.organizerId),
+                      );
+                      final orgResponse = await Amplify.API
+                          .query(request: orgRequest)
+                          .response;
+                      final organizers = orgResponse.data?.items;
+
+                      if (organizers != null &&
+                          organizers.isNotEmpty &&
+                          organizers.first != null) {
+                        final organizer = organizers.first!;
+                        final updatedOrganizer = organizer.copyWith(
+                          walletBalance: organizer.walletBalance + playerShare,
+                        );
+                        await Amplify.API
+                            .mutate(
+                              request: ModelMutations.update(updatedOrganizer),
+                            )
+                            .response;
+                      }
+
+                      final playerPayment = Payment(
+                        amount: playerShare,
+                        type: 'RSVP Fee Debit',
+                        status: 'Completed',
+                        user: updatedPlayer,
+                      );
+                      await Amplify.API
+                          .mutate(request: ModelMutations.create(playerPayment))
+                          .response;
+
+                      final newRsvp = RSVP(
+                        status: 'Going',
+                        game: game,
+                        user: updatedPlayer,
+                      );
+                      final rsvpResponse = await Amplify.API
+                          .mutate(request: ModelMutations.create(newRsvp))
+                          .response;
+
+                      if (!rsvpResponse.hasErrors && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You are marked as GOING!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } on ApiException catch (e) {
+                      safePrint('RSVP Transaction failed: $e');
+                    }
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'GOING',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    side: const BorderSide(color: Colors.black, width: 2),
+                  ),
+                  onPressed: () async {
+                    try {
+                      final authUser = await Amplify.Auth.getCurrentUser();
+                      final userId = authUser.userId;
+
+                      final userRequest = ModelQueries.list(
+                        User.classType,
+                        where: User.ID.eq(userId),
+                      );
+                      final userResponse = await Amplify.API
+                          .query(request: userRequest)
+                          .response;
+                      final users = userResponse.data?.items;
+
+                      if (users == null ||
+                          users.isEmpty ||
+                          users.first == null) {
+                        return;
+                      }
+                      final player = users.first!;
+
+                      final newRsvp = RSVP(
+                        status: 'Not Going',
+                        game: game,
+                        user: player,
+                      );
+
+                      final request = ModelMutations.create(newRsvp);
+                      final response = await Amplify.API
+                          .mutate(request: request)
+                          .response;
+
+                      if (response.hasErrors) {
+                        safePrint('RSVP Errors: ${response.errors}');
+                      } else {
+                        safePrint(
+                          'RSVP NOT GOING recorded for ${player.name}!',
+                        );
+
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('You are marked as NOT GOING.'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      }
+                    } on ApiException catch (e) {
+                      safePrint('RSVP Mutation failed: $e');
+                    }
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'NOT GOING',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 32, color: Colors.black87),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+=== FILE: lib/features/scheduling/create_game_screen.dart ===
+
+// Ensure these imports are at the top of create_game_screen.dart:
+import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_api/amplify_api.dart';
+import 'package:moneyballer/models/ModelProvider.dart';
+
+class CreateGameScreen extends StatefulWidget {
+  const CreateGameScreen({super.key});
+
+  @override
+  State<CreateGameScreen> createState() => _CreateGameScreenState();
+}
+
+class _CreateGameScreenState extends State<CreateGameScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _locationController = TextEditingController();
+  final _maxPlayersController = TextEditingController();
+
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+      builder: (context, child) => Theme(
+        data: ThemeData.light().copyWith(
+          colorScheme: const ColorScheme.light(primary: Colors.black),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) => Theme(
+        data: ThemeData.light().copyWith(
+          colorScheme: const ColorScheme.light(primary: Colors.black),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _selectedTime = picked);
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    _maxPlayersController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[200],
+      appBar: AppBar(
+        title: const Text(
+          'Create Game',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            _buildLabel('Date'),
+            _buildPickerField(
+              text: _selectedDate == null
+                  ? 'Select Date'
+                  : '${_selectedDate!.toLocal()}'.split(' ')[0],
+              icon: Icons.calendar_today,
+              onTap: _pickDate,
+            ),
+            const SizedBox(height: 24),
+
+            _buildLabel('Time'),
+            _buildPickerField(
+              text: _selectedTime == null
+                  ? 'Select Time'
+                  : _selectedTime!.format(context),
+              icon: Icons.access_time,
+              onTap: _pickTime,
+            ),
+            const SizedBox(height: 24),
+
+            _buildLabel('Location'),
+            TextFormField(
+              controller: _locationController,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              decoration: _inputStyle('Enter field or park name'),
+              validator: (value) => value == null || value.isEmpty
+                  ? 'Location is required'
+                  : null,
+            ),
+            const SizedBox(height: 24),
+
+            _buildLabel('Max Players limit'),
+            TextFormField(
+              controller: _maxPlayersController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              decoration: _inputStyle('e.g., 10 or 20'),
+              validator: (value) =>
+                  value == null || value.isEmpty ? 'Limit is required' : null,
+            ),
+            const SizedBox(height: 40),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                if (_formKey.currentState!.validate() &&
+                    _selectedDate != null &&
+                    _selectedTime != null) {
+                  final int maxPlayers = int.parse(_maxPlayersController.text);
+                  // Calculate the upfront organizer float fee based on session size[cite: 1]
+                  final double fee = maxPlayers <= 10 ? 1.99 : 2.99;
+
+                  try {
+                    // 1. Fetch the authenticated Cognito User
+                    final authUser = await Amplify.Auth.getCurrentUser();
+                    final userId = authUser.userId;
+
+                    // 2. Fetch the Organizer's current wallet balance from DynamoDB
+                    final userRequest = ModelQueries.list(
+                      User.classType,
+                      where: User.ID.eq(userId),
+                    );
+                    final userResponse = await Amplify.API
+                        .query(request: userRequest)
+                        .response;
+                    final users = userResponse.data?.items;
+
+                    if (users == null || users.isEmpty || users.first == null) {
+                      safePrint('Organizer profile not found in DynamoDB.');
+                      return;
+                    }
+                    final organizer = users.first!;
+
+                    // 3. Verify sufficient funds
+                    if (organizer.walletBalance < fee) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Insufficient funds. Please top up \$$fee to schedule.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    // 4. Deduct the upfront fee from the organizer's wallet[cite: 1]
+                    final updatedOrganizer = organizer.copyWith(
+                      walletBalance: organizer.walletBalance - fee,
+                    );
+                    await Amplify.API
+                        .mutate(
+                          request: ModelMutations.update(updatedOrganizer),
+                        )
+                        .response;
+
+                    // 5. Generate the Payment receipt using the full user object[cite: 5]
+                    final payment = Payment(
+                      amount: fee,
+                      type: 'Organizer Fee Debit',
+                      status: 'Completed',
+                      user: organizer,
+                    );
+                    await Amplify.API
+                        .mutate(request: ModelMutations.create(payment))
+                        .response;
+
+                    // 6. Schedule the Game[cite: 1]
+                    final combinedDateTime = DateTime(
+                      _selectedDate!.year,
+                      _selectedDate!.month,
+                      _selectedDate!.day,
+                      _selectedTime!.hour,
+                      _selectedTime!.minute,
+                    );
+
+                    final newGame = Game(
+                      date: TemporalDate(_selectedDate!),
+                      time: TemporalTime(combinedDateTime),
+                      location: _locationController.text,
+                      organizerId: userId,
+                      maxPlayers: maxPlayers,
+                      appFee: fee,
+                      minimumBalanceRequired: fee,
+                    );
+
+                    final gameResponse = await Amplify.API
+                        .mutate(request: ModelMutations.create(newGame))
+                        .response;
+
+                    if (gameResponse.hasErrors) {
+                      safePrint('Game creation errors: ${gameResponse.errors}');
+                    } else {
+                      safePrint(
+                        'Game scheduled and \$$fee deducted successfully!',
+                      );
+                      if (context.mounted) Navigator.pop(context, true);
+                    }
+                  } on ApiException catch (e) {
+                    safePrint('Transaction failed: $e');
+                  }
+                }
+              },
+              child: const Text(
+                'SCHEDULE GAME',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w900,
+          color: Colors.black,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputStyle(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.grey),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.black, width: 3),
+      ),
+    );
+  }
+
+  Widget _buildPickerField({
+    required String text,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 28, color: Colors.black87),
+            const SizedBox(width: 16),
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+=== FILE: lib/amplify_outputs.dart ===
+
+const amplifyConfig = r'''{
+  "auth": {
+    "user_pool_id": "ap-southeast-2_OFu20mMgQ",
+    "aws_region": "ap-southeast-2",
+    "user_pool_client_id": "3785k6eo4f9uo2js17mcmevlqp",
+    "identity_pool_id": "ap-southeast-2:b271b0ed-39dc-4072-8624-d7b6eb0b6795",
+    "mfa_methods": [],
+    "standard_required_attributes": [
+      "email"
+    ],
+    "username_attributes": [
+      "email"
+    ],
+    "user_verification_types": [
+      "email"
+    ],
+    "groups": [],
+    "mfa_configuration": "NONE",
+    "password_policy": {
+      "min_length": 8,
+      "require_lowercase": true,
+      "require_numbers": true,
+      "require_symbols": true,
+      "require_uppercase": true
+    },
+    "unauthenticated_identities_enabled": true
+  },
+  "data": {
+    "url": "https://oomh6s2pubbmjhelvbtwoxgtoe.appsync-api.ap-southeast-2.amazonaws.com/graphql",
+    "aws_region": "ap-southeast-2",
+    "api_key": "da2-ocuug2biwjaezhixu63wytyb3q",
+    "default_authorization_type": "API_KEY",
+    "authorization_types": [
+      "AMAZON_COGNITO_USER_POOLS",
+      "AWS_IAM"
+    ],
+    "model_introspection": {
+      "version": 1,
+      "models": {
+        "User": {
+          "name": "User",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "name": {
+              "name": "name",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "email": {
+              "name": "email",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "role": {
+              "name": "role",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "walletBalance": {
+              "name": "walletBalance",
+              "isArray": false,
+              "type": "Float",
+              "isRequired": true,
+              "attributes": []
+            },
+            "teams": {
+              "name": "teams",
+              "isArray": true,
+              "type": {
+                "model": "TeamMember"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "isArrayNullable": true,
+              "association": {
+                "connectionType": "HAS_MANY",
+                "associatedWith": [
+                  "userId"
+                ]
+              }
+            },
+            "payments": {
+              "name": "payments",
+              "isArray": true,
+              "type": {
+                "model": "Payment"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "isArrayNullable": true,
+              "association": {
+                "connectionType": "HAS_MANY",
+                "associatedWith": [
+                  "userId"
+                ]
+              }
+            },
+            "rsvps": {
+              "name": "rsvps",
+              "isArray": true,
+              "type": {
+                "model": "RSVP"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "isArrayNullable": true,
+              "association": {
+                "connectionType": "HAS_MANY",
+                "associatedWith": [
+                  "userId"
+                ]
+              }
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "Users",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        },
+        "Team": {
+          "name": "Team",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "name": {
+              "name": "name",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "members": {
+              "name": "members",
+              "isArray": true,
+              "type": {
+                "model": "TeamMember"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "isArrayNullable": true,
+              "association": {
+                "connectionType": "HAS_MANY",
+                "associatedWith": [
+                  "teamId"
+                ]
+              }
+            },
+            "games": {
+              "name": "games",
+              "isArray": true,
+              "type": {
+                "model": "Game"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "isArrayNullable": true,
+              "association": {
+                "connectionType": "HAS_MANY",
+                "associatedWith": [
+                  "teamId"
+                ]
+              }
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "Teams",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        },
+        "TeamMember": {
+          "name": "TeamMember",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "userId": {
+              "name": "userId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "teamId": {
+              "name": "teamId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "user": {
+              "name": "user",
+              "isArray": false,
+              "type": {
+                "model": "User"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "association": {
+                "connectionType": "BELONGS_TO",
+                "targetNames": [
+                  "userId"
+                ]
+              }
+            },
+            "team": {
+              "name": "team",
+              "isArray": false,
+              "type": {
+                "model": "Team"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "association": {
+                "connectionType": "BELONGS_TO",
+                "targetNames": [
+                  "teamId"
+                ]
+              }
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "TeamMembers",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        },
+        "Game": {
+          "name": "Game",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "date": {
+              "name": "date",
+              "isArray": false,
+              "type": "AWSDate",
+              "isRequired": true,
+              "attributes": []
+            },
+            "time": {
+              "name": "time",
+              "isArray": false,
+              "type": "AWSTime",
+              "isRequired": true,
+              "attributes": []
+            },
+            "location": {
+              "name": "location",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "organizerId": {
+              "name": "organizerId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "maxPlayers": {
+              "name": "maxPlayers",
+              "isArray": false,
+              "type": "Int",
+              "isRequired": true,
+              "attributes": []
+            },
+            "appFee": {
+              "name": "appFee",
+              "isArray": false,
+              "type": "Float",
+              "isRequired": true,
+              "attributes": []
+            },
+            "minimumBalanceRequired": {
+              "name": "minimumBalanceRequired",
+              "isArray": false,
+              "type": "Float",
+              "isRequired": true,
+              "attributes": []
+            },
+            "teamId": {
+              "name": "teamId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": false,
+              "attributes": []
+            },
+            "team": {
+              "name": "team",
+              "isArray": false,
+              "type": {
+                "model": "Team"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "association": {
+                "connectionType": "BELONGS_TO",
+                "targetNames": [
+                  "teamId"
+                ]
+              }
+            },
+            "rsvps": {
+              "name": "rsvps",
+              "isArray": true,
+              "type": {
+                "model": "RSVP"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "isArrayNullable": true,
+              "association": {
+                "connectionType": "HAS_MANY",
+                "associatedWith": [
+                  "gameId"
+                ]
+              }
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "Games",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        },
+        "Venue": {
+          "name": "Venue",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "name": {
+              "name": "name",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "address": {
+              "name": "address",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "Venues",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        },
+        "RSVP": {
+          "name": "RSVP",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "status": {
+              "name": "status",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "gameId": {
+              "name": "gameId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "userId": {
+              "name": "userId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "game": {
+              "name": "game",
+              "isArray": false,
+              "type": {
+                "model": "Game"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "association": {
+                "connectionType": "BELONGS_TO",
+                "targetNames": [
+                  "gameId"
+                ]
+              }
+            },
+            "user": {
+              "name": "user",
+              "isArray": false,
+              "type": {
+                "model": "User"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "association": {
+                "connectionType": "BELONGS_TO",
+                "targetNames": [
+                  "userId"
+                ]
+              }
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "RSVPS",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        },
+        "Payment": {
+          "name": "Payment",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "amount": {
+              "name": "amount",
+              "isArray": false,
+              "type": "Float",
+              "isRequired": true,
+              "attributes": []
+            },
+            "type": {
+              "name": "type",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "status": {
+              "name": "status",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "userId": {
+              "name": "userId",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "user": {
+              "name": "user",
+              "isArray": false,
+              "type": {
+                "model": "User"
+              },
+              "isRequired": false,
+              "attributes": [],
+              "association": {
+                "connectionType": "BELONGS_TO",
+                "targetNames": [
+                  "userId"
+                ]
+              }
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "Payments",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        }
+      },
+      "enums": {},
+      "nonModels": {}
+    }
+  },
+  "version": "1.5"
+}''';
+=== FILE: lib/models/Venue.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'ModelProvider.dart';
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+
+
+/** This is an auto generated class representing the Venue type in your schema. */
+class Venue extends amplify_core.Model {
+  static const classType = const _VenueModelType();
+  final String id;
+  final String? _name;
+  final String? _address;
+  final amplify_core.TemporalDateTime? _createdAt;
+  final amplify_core.TemporalDateTime? _updatedAt;
+
+  @override
+  getInstanceType() => classType;
+  
+  @Deprecated('[getId] is being deprecated in favor of custom primary key feature. Use getter [modelIdentifier] to get model identifier.')
+  @override
+  String getId() => id;
+  
+  VenueModelIdentifier get modelIdentifier {
+      return VenueModelIdentifier(
+        id: id
+      );
+  }
+  
+  String get name {
+    try {
+      return _name!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  String get address {
+    try {
+      return _address!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  amplify_core.TemporalDateTime? get createdAt {
+    return _createdAt;
+  }
+  
+  amplify_core.TemporalDateTime? get updatedAt {
+    return _updatedAt;
+  }
+  
+  const Venue._internal({required this.id, required name, required address, createdAt, updatedAt}): _name = name, _address = address, _createdAt = createdAt, _updatedAt = updatedAt;
+  
+  factory Venue({String? id, required String name, required String address}) {
+    return Venue._internal(
+      id: id == null ? amplify_core.UUID.getUUID() : id,
+      name: name,
+      address: address);
+  }
+  
+  bool equals(Object other) {
+    return this == other;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is Venue &&
+      id == other.id &&
+      _name == other._name &&
+      _address == other._address;
+  }
+  
+  @override
+  int get hashCode => toString().hashCode;
+  
+  @override
+  String toString() {
+    var buffer = new StringBuffer();
+    
+    buffer.write("Venue {");
+    buffer.write("id=" + "$id" + ", ");
+    buffer.write("name=" + "$_name" + ", ");
+    buffer.write("address=" + "$_address" + ", ");
+    buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
+    buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
+    buffer.write("}");
+    
+    return buffer.toString();
+  }
+  
+  Venue copyWith({String? name, String? address}) {
+    return Venue._internal(
+      id: id,
+      name: name ?? this.name,
+      address: address ?? this.address);
+  }
+  
+  Venue copyWithModelFieldValues({
+    ModelFieldValue<String>? name,
+    ModelFieldValue<String>? address
+  }) {
+    return Venue._internal(
+      id: id,
+      name: name == null ? this.name : name.value,
+      address: address == null ? this.address : address.value
+    );
+  }
+  
+  Venue.fromJson(Map<String, dynamic> json)  
+    : id = json['id'],
+      _name = json['name'],
+      _address = json['address'],
+      _createdAt = json['createdAt'] != null ? amplify_core.TemporalDateTime.fromString(json['createdAt']) : null,
+      _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
+  
+  Map<String, dynamic> toJson() => {
+    'id': id, 'name': _name, 'address': _address, 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+  };
+  
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'name': _name,
+    'address': _address,
+    'createdAt': _createdAt,
+    'updatedAt': _updatedAt
+  };
+
+  static final amplify_core.QueryModelIdentifier<VenueModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<VenueModelIdentifier>();
+  static final ID = amplify_core.QueryField(fieldName: "id");
+  static final NAME = amplify_core.QueryField(fieldName: "name");
+  static final ADDRESS = amplify_core.QueryField(fieldName: "address");
+  static var schema = amplify_core.Model.defineSchema(define: (amplify_core.ModelSchemaDefinition modelSchemaDefinition) {
+    modelSchemaDefinition.name = "Venue";
+    modelSchemaDefinition.pluralName = "Venues";
+    
+    modelSchemaDefinition.authRules = [
+      amplify_core.AuthRule(
+        authStrategy: amplify_core.AuthStrategy.PUBLIC,
+        provider: amplify_core.AuthRuleProvider.APIKEY,
+        operations: const [
+          amplify_core.ModelOperation.CREATE,
+          amplify_core.ModelOperation.UPDATE,
+          amplify_core.ModelOperation.DELETE,
+          amplify_core.ModelOperation.READ
+        ])
+    ];
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.id());
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Venue.NAME,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Venue.ADDRESS,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'createdAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'updatedAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+  });
+}
+
+class _VenueModelType extends amplify_core.ModelType<Venue> {
+  const _VenueModelType();
+  
+  @override
+  Venue fromJson(Map<String, dynamic> jsonData) {
+    return Venue.fromJson(jsonData);
+  }
+  
+  @override
+  String modelName() {
+    return 'Venue';
+  }
+}
+
+/**
+ * This is an auto generated class representing the model identifier
+ * of [Venue] in your schema.
+ */
+class VenueModelIdentifier implements amplify_core.ModelIdentifier<Venue> {
+  final String id;
+
+  /** Create an instance of VenueModelIdentifier using [id] the primary key. */
+  const VenueModelIdentifier({
+    required this.id});
+  
+  @override
+  Map<String, dynamic> serializeAsMap() => (<String, dynamic>{
+    'id': id
+  });
+  
+  @override
+  List<Map<String, dynamic>> serializeAsList() => serializeAsMap()
+    .entries
+    .map((entry) => (<String, dynamic>{ entry.key: entry.value }))
+    .toList();
+  
+  @override
+  String serializeAsString() => serializeAsMap().values.join('#');
+  
+  @override
+  String toString() => 'VenueModelIdentifier(id: $id)';
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    
+    return other is VenueModelIdentifier &&
+      id == other.id;
+  }
+  
+  @override
+  int get hashCode =>
+    id.hashCode;
+}
+=== FILE: lib/models/Team.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'ModelProvider.dart';
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+import 'package:collection/collection.dart';
+
+
+/** This is an auto generated class representing the Team type in your schema. */
+class Team extends amplify_core.Model {
+  static const classType = const _TeamModelType();
+  final String id;
+  final String? _name;
+  final List<TeamMember>? _members;
+  final List<Game>? _games;
+  final amplify_core.TemporalDateTime? _createdAt;
+  final amplify_core.TemporalDateTime? _updatedAt;
+
+  @override
+  getInstanceType() => classType;
+  
+  @Deprecated('[getId] is being deprecated in favor of custom primary key feature. Use getter [modelIdentifier] to get model identifier.')
+  @override
+  String getId() => id;
+  
+  TeamModelIdentifier get modelIdentifier {
+      return TeamModelIdentifier(
+        id: id
+      );
+  }
+  
+  String get name {
+    try {
+      return _name!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  List<TeamMember>? get members {
+    return _members;
+  }
+  
+  List<Game>? get games {
+    return _games;
+  }
+  
+  amplify_core.TemporalDateTime? get createdAt {
+    return _createdAt;
+  }
+  
+  amplify_core.TemporalDateTime? get updatedAt {
+    return _updatedAt;
+  }
+  
+  const Team._internal({required this.id, required name, members, games, createdAt, updatedAt}): _name = name, _members = members, _games = games, _createdAt = createdAt, _updatedAt = updatedAt;
+  
+  factory Team({String? id, required String name, List<TeamMember>? members, List<Game>? games}) {
+    return Team._internal(
+      id: id == null ? amplify_core.UUID.getUUID() : id,
+      name: name,
+      members: members != null ? List<TeamMember>.unmodifiable(members) : members,
+      games: games != null ? List<Game>.unmodifiable(games) : games);
+  }
+  
+  bool equals(Object other) {
+    return this == other;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is Team &&
+      id == other.id &&
+      _name == other._name &&
+      DeepCollectionEquality().equals(_members, other._members) &&
+      DeepCollectionEquality().equals(_games, other._games);
+  }
+  
+  @override
+  int get hashCode => toString().hashCode;
+  
+  @override
+  String toString() {
+    var buffer = new StringBuffer();
+    
+    buffer.write("Team {");
+    buffer.write("id=" + "$id" + ", ");
+    buffer.write("name=" + "$_name" + ", ");
+    buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
+    buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
+    buffer.write("}");
+    
+    return buffer.toString();
+  }
+  
+  Team copyWith({String? name, List<TeamMember>? members, List<Game>? games}) {
+    return Team._internal(
+      id: id,
+      name: name ?? this.name,
+      members: members ?? this.members,
+      games: games ?? this.games);
+  }
+  
+  Team copyWithModelFieldValues({
+    ModelFieldValue<String>? name,
+    ModelFieldValue<List<TeamMember>?>? members,
+    ModelFieldValue<List<Game>?>? games
+  }) {
+    return Team._internal(
+      id: id,
+      name: name == null ? this.name : name.value,
+      members: members == null ? this.members : members.value,
+      games: games == null ? this.games : games.value
+    );
+  }
+  
+  Team.fromJson(Map<String, dynamic> json)  
+    : id = json['id'],
+      _name = json['name'],
+      _members = json['members']  is Map
+        ? (json['members']['items'] is List
+          ? (json['members']['items'] as List)
+              .where((e) => e != null)
+              .map((e) => TeamMember.fromJson(new Map<String, dynamic>.from(e)))
+              .toList()
+          : null)
+        : (json['members'] is List
+          ? (json['members'] as List)
+              .where((e) => e?['serializedData'] != null)
+              .map((e) => TeamMember.fromJson(new Map<String, dynamic>.from(e?['serializedData'])))
+              .toList()
+          : null),
+      _games = json['games']  is Map
+        ? (json['games']['items'] is List
+          ? (json['games']['items'] as List)
+              .where((e) => e != null)
+              .map((e) => Game.fromJson(new Map<String, dynamic>.from(e)))
+              .toList()
+          : null)
+        : (json['games'] is List
+          ? (json['games'] as List)
+              .where((e) => e?['serializedData'] != null)
+              .map((e) => Game.fromJson(new Map<String, dynamic>.from(e?['serializedData'])))
+              .toList()
+          : null),
+      _createdAt = json['createdAt'] != null ? amplify_core.TemporalDateTime.fromString(json['createdAt']) : null,
+      _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
+  
+  Map<String, dynamic> toJson() => {
+    'id': id, 'name': _name, 'members': _members?.map((TeamMember? e) => e?.toJson()).toList(), 'games': _games?.map((Game? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+  };
+  
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'name': _name,
+    'members': _members,
+    'games': _games,
+    'createdAt': _createdAt,
+    'updatedAt': _updatedAt
+  };
+
+  static final amplify_core.QueryModelIdentifier<TeamModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<TeamModelIdentifier>();
+  static final ID = amplify_core.QueryField(fieldName: "id");
+  static final NAME = amplify_core.QueryField(fieldName: "name");
+  static final MEMBERS = amplify_core.QueryField(
+    fieldName: "members",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'TeamMember'));
+  static final GAMES = amplify_core.QueryField(
+    fieldName: "games",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'Game'));
+  static var schema = amplify_core.Model.defineSchema(define: (amplify_core.ModelSchemaDefinition modelSchemaDefinition) {
+    modelSchemaDefinition.name = "Team";
+    modelSchemaDefinition.pluralName = "Teams";
+    
+    modelSchemaDefinition.authRules = [
+      amplify_core.AuthRule(
+        authStrategy: amplify_core.AuthStrategy.PUBLIC,
+        provider: amplify_core.AuthRuleProvider.APIKEY,
+        operations: const [
+          amplify_core.ModelOperation.CREATE,
+          amplify_core.ModelOperation.UPDATE,
+          amplify_core.ModelOperation.DELETE,
+          amplify_core.ModelOperation.READ
+        ])
+    ];
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.id());
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Team.NAME,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.hasMany(
+      key: Team.MEMBERS,
+      isRequired: false,
+      ofModelName: 'TeamMember',
+      associatedKey: TeamMember.TEAM
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.hasMany(
+      key: Team.GAMES,
+      isRequired: false,
+      ofModelName: 'Game',
+      associatedKey: Game.TEAM
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'createdAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'updatedAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+  });
+}
+
+class _TeamModelType extends amplify_core.ModelType<Team> {
+  const _TeamModelType();
+  
+  @override
+  Team fromJson(Map<String, dynamic> jsonData) {
+    return Team.fromJson(jsonData);
+  }
+  
+  @override
+  String modelName() {
+    return 'Team';
+  }
+}
+
+/**
+ * This is an auto generated class representing the model identifier
+ * of [Team] in your schema.
+ */
+class TeamModelIdentifier implements amplify_core.ModelIdentifier<Team> {
+  final String id;
+
+  /** Create an instance of TeamModelIdentifier using [id] the primary key. */
+  const TeamModelIdentifier({
+    required this.id});
+  
+  @override
+  Map<String, dynamic> serializeAsMap() => (<String, dynamic>{
+    'id': id
+  });
+  
+  @override
+  List<Map<String, dynamic>> serializeAsList() => serializeAsMap()
+    .entries
+    .map((entry) => (<String, dynamic>{ entry.key: entry.value }))
+    .toList();
+  
+  @override
+  String serializeAsString() => serializeAsMap().values.join('#');
+  
+  @override
+  String toString() => 'TeamModelIdentifier(id: $id)';
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    
+    return other is TeamModelIdentifier &&
+      id == other.id;
+  }
+  
+  @override
+  int get hashCode =>
+    id.hashCode;
+}
+=== FILE: lib/models/User.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'ModelProvider.dart';
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+import 'package:collection/collection.dart';
+
+
+/** This is an auto generated class representing the User type in your schema. */
+class User extends amplify_core.Model {
+  static const classType = const _UserModelType();
+  final String id;
+  final String? _name;
+  final String? _email;
+  final String? _role;
+  final double? _walletBalance;
+  final List<TeamMember>? _teams;
+  final List<Payment>? _payments;
+  final List<RSVP>? _rsvps;
+  final amplify_core.TemporalDateTime? _createdAt;
+  final amplify_core.TemporalDateTime? _updatedAt;
+
+  @override
+  getInstanceType() => classType;
+  
+  @Deprecated('[getId] is being deprecated in favor of custom primary key feature. Use getter [modelIdentifier] to get model identifier.')
+  @override
+  String getId() => id;
+  
+  UserModelIdentifier get modelIdentifier {
+      return UserModelIdentifier(
+        id: id
+      );
+  }
+  
+  String get name {
+    try {
+      return _name!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  String get email {
+    try {
+      return _email!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  String? get role {
+    return _role;
+  }
+  
+  double get walletBalance {
+    try {
+      return _walletBalance!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  List<TeamMember>? get teams {
+    return _teams;
+  }
+  
+  List<Payment>? get payments {
+    return _payments;
+  }
+  
+  List<RSVP>? get rsvps {
+    return _rsvps;
+  }
+  
+  amplify_core.TemporalDateTime? get createdAt {
+    return _createdAt;
+  }
+  
+  amplify_core.TemporalDateTime? get updatedAt {
+    return _updatedAt;
+  }
+  
+  const User._internal({required this.id, required name, required email, role, required walletBalance, teams, payments, rsvps, createdAt, updatedAt}): _name = name, _email = email, _role = role, _walletBalance = walletBalance, _teams = teams, _payments = payments, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
+  
+  factory User({String? id, required String name, required String email, String? role, required double walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
+    return User._internal(
+      id: id == null ? amplify_core.UUID.getUUID() : id,
+      name: name,
+      email: email,
+      role: role,
+      walletBalance: walletBalance,
+      teams: teams != null ? List<TeamMember>.unmodifiable(teams) : teams,
+      payments: payments != null ? List<Payment>.unmodifiable(payments) : payments,
+      rsvps: rsvps != null ? List<RSVP>.unmodifiable(rsvps) : rsvps);
+  }
+  
+  bool equals(Object other) {
+    return this == other;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is User &&
+      id == other.id &&
+      _name == other._name &&
+      _email == other._email &&
+      _role == other._role &&
+      _walletBalance == other._walletBalance &&
+      DeepCollectionEquality().equals(_teams, other._teams) &&
+      DeepCollectionEquality().equals(_payments, other._payments) &&
+      DeepCollectionEquality().equals(_rsvps, other._rsvps);
+  }
+  
+  @override
+  int get hashCode => toString().hashCode;
+  
+  @override
+  String toString() {
+    var buffer = new StringBuffer();
+    
+    buffer.write("User {");
+    buffer.write("id=" + "$id" + ", ");
+    buffer.write("name=" + "$_name" + ", ");
+    buffer.write("email=" + "$_email" + ", ");
+    buffer.write("role=" + "$_role" + ", ");
+    buffer.write("walletBalance=" + (_walletBalance != null ? _walletBalance!.toString() : "null") + ", ");
+    buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
+    buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
+    buffer.write("}");
+    
+    return buffer.toString();
+  }
+  
+  User copyWith({String? name, String? email, String? role, double? walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
+    return User._internal(
+      id: id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      role: role ?? this.role,
+      walletBalance: walletBalance ?? this.walletBalance,
+      teams: teams ?? this.teams,
+      payments: payments ?? this.payments,
+      rsvps: rsvps ?? this.rsvps);
+  }
+  
+  User copyWithModelFieldValues({
+    ModelFieldValue<String>? name,
+    ModelFieldValue<String>? email,
+    ModelFieldValue<String?>? role,
+    ModelFieldValue<double>? walletBalance,
+    ModelFieldValue<List<TeamMember>?>? teams,
+    ModelFieldValue<List<Payment>?>? payments,
+    ModelFieldValue<List<RSVP>?>? rsvps
+  }) {
+    return User._internal(
+      id: id,
+      name: name == null ? this.name : name.value,
+      email: email == null ? this.email : email.value,
+      role: role == null ? this.role : role.value,
+      walletBalance: walletBalance == null ? this.walletBalance : walletBalance.value,
+      teams: teams == null ? this.teams : teams.value,
+      payments: payments == null ? this.payments : payments.value,
+      rsvps: rsvps == null ? this.rsvps : rsvps.value
+    );
+  }
+  
+  User.fromJson(Map<String, dynamic> json)  
+    : id = json['id'],
+      _name = json['name'],
+      _email = json['email'],
+      _role = json['role'],
+      _walletBalance = (json['walletBalance'] as num?)?.toDouble(),
+      _teams = json['teams']  is Map
+        ? (json['teams']['items'] is List
+          ? (json['teams']['items'] as List)
+              .where((e) => e != null)
+              .map((e) => TeamMember.fromJson(new Map<String, dynamic>.from(e)))
+              .toList()
+          : null)
+        : (json['teams'] is List
+          ? (json['teams'] as List)
+              .where((e) => e?['serializedData'] != null)
+              .map((e) => TeamMember.fromJson(new Map<String, dynamic>.from(e?['serializedData'])))
+              .toList()
+          : null),
+      _payments = json['payments']  is Map
+        ? (json['payments']['items'] is List
+          ? (json['payments']['items'] as List)
+              .where((e) => e != null)
+              .map((e) => Payment.fromJson(new Map<String, dynamic>.from(e)))
+              .toList()
+          : null)
+        : (json['payments'] is List
+          ? (json['payments'] as List)
+              .where((e) => e?['serializedData'] != null)
+              .map((e) => Payment.fromJson(new Map<String, dynamic>.from(e?['serializedData'])))
+              .toList()
+          : null),
+      _rsvps = json['rsvps']  is Map
+        ? (json['rsvps']['items'] is List
+          ? (json['rsvps']['items'] as List)
+              .where((e) => e != null)
+              .map((e) => RSVP.fromJson(new Map<String, dynamic>.from(e)))
+              .toList()
+          : null)
+        : (json['rsvps'] is List
+          ? (json['rsvps'] as List)
+              .where((e) => e?['serializedData'] != null)
+              .map((e) => RSVP.fromJson(new Map<String, dynamic>.from(e?['serializedData'])))
+              .toList()
+          : null),
+      _createdAt = json['createdAt'] != null ? amplify_core.TemporalDateTime.fromString(json['createdAt']) : null,
+      _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
+  
+  Map<String, dynamic> toJson() => {
+    'id': id, 'name': _name, 'email': _email, 'role': _role, 'walletBalance': _walletBalance, 'teams': _teams?.map((TeamMember? e) => e?.toJson()).toList(), 'payments': _payments?.map((Payment? e) => e?.toJson()).toList(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+  };
+  
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'name': _name,
+    'email': _email,
+    'role': _role,
+    'walletBalance': _walletBalance,
+    'teams': _teams,
+    'payments': _payments,
+    'rsvps': _rsvps,
+    'createdAt': _createdAt,
+    'updatedAt': _updatedAt
+  };
+
+  static final amplify_core.QueryModelIdentifier<UserModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<UserModelIdentifier>();
+  static final ID = amplify_core.QueryField(fieldName: "id");
+  static final NAME = amplify_core.QueryField(fieldName: "name");
+  static final EMAIL = amplify_core.QueryField(fieldName: "email");
+  static final ROLE = amplify_core.QueryField(fieldName: "role");
+  static final WALLETBALANCE = amplify_core.QueryField(fieldName: "walletBalance");
+  static final TEAMS = amplify_core.QueryField(
+    fieldName: "teams",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'TeamMember'));
+  static final PAYMENTS = amplify_core.QueryField(
+    fieldName: "payments",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'Payment'));
+  static final RSVPS = amplify_core.QueryField(
+    fieldName: "rsvps",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'RSVP'));
+  static var schema = amplify_core.Model.defineSchema(define: (amplify_core.ModelSchemaDefinition modelSchemaDefinition) {
+    modelSchemaDefinition.name = "User";
+    modelSchemaDefinition.pluralName = "Users";
+    
+    modelSchemaDefinition.authRules = [
+      amplify_core.AuthRule(
+        authStrategy: amplify_core.AuthStrategy.PUBLIC,
+        provider: amplify_core.AuthRuleProvider.APIKEY,
+        operations: const [
+          amplify_core.ModelOperation.CREATE,
+          amplify_core.ModelOperation.UPDATE,
+          amplify_core.ModelOperation.DELETE,
+          amplify_core.ModelOperation.READ
+        ])
+    ];
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.id());
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.NAME,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.EMAIL,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.ROLE,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.WALLETBALANCE,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.hasMany(
+      key: User.TEAMS,
+      isRequired: false,
+      ofModelName: 'TeamMember',
+      associatedKey: TeamMember.USER
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.hasMany(
+      key: User.PAYMENTS,
+      isRequired: false,
+      ofModelName: 'Payment',
+      associatedKey: Payment.USER
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.hasMany(
+      key: User.RSVPS,
+      isRequired: false,
+      ofModelName: 'RSVP',
+      associatedKey: RSVP.USER
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'createdAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'updatedAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+  });
+}
+
+class _UserModelType extends amplify_core.ModelType<User> {
+  const _UserModelType();
+  
+  @override
+  User fromJson(Map<String, dynamic> jsonData) {
+    return User.fromJson(jsonData);
+  }
+  
+  @override
+  String modelName() {
+    return 'User';
+  }
+}
+
+/**
+ * This is an auto generated class representing the model identifier
+ * of [User] in your schema.
+ */
+class UserModelIdentifier implements amplify_core.ModelIdentifier<User> {
+  final String id;
+
+  /** Create an instance of UserModelIdentifier using [id] the primary key. */
+  const UserModelIdentifier({
+    required this.id});
+  
+  @override
+  Map<String, dynamic> serializeAsMap() => (<String, dynamic>{
+    'id': id
+  });
+  
+  @override
+  List<Map<String, dynamic>> serializeAsList() => serializeAsMap()
+    .entries
+    .map((entry) => (<String, dynamic>{ entry.key: entry.value }))
+    .toList();
+  
+  @override
+  String serializeAsString() => serializeAsMap().values.join('#');
+  
+  @override
+  String toString() => 'UserModelIdentifier(id: $id)';
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    
+    return other is UserModelIdentifier &&
+      id == other.id;
+  }
+  
+  @override
+  int get hashCode =>
+    id.hashCode;
+}
+=== FILE: lib/models/TeamMember.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'ModelProvider.dart';
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+
+
+/** This is an auto generated class representing the TeamMember type in your schema. */
+class TeamMember extends amplify_core.Model {
+  static const classType = const _TeamMemberModelType();
+  final String id;
+  final User? _user;
+  final Team? _team;
+  final amplify_core.TemporalDateTime? _createdAt;
+  final amplify_core.TemporalDateTime? _updatedAt;
+
+  @override
+  getInstanceType() => classType;
+  
+  @Deprecated('[getId] is being deprecated in favor of custom primary key feature. Use getter [modelIdentifier] to get model identifier.')
+  @override
+  String getId() => id;
+  
+  TeamMemberModelIdentifier get modelIdentifier {
+      return TeamMemberModelIdentifier(
+        id: id
+      );
+  }
+  
+  User? get user {
+    return _user;
+  }
+  
+  Team? get team {
+    return _team;
+  }
+  
+  amplify_core.TemporalDateTime? get createdAt {
+    return _createdAt;
+  }
+  
+  amplify_core.TemporalDateTime? get updatedAt {
+    return _updatedAt;
+  }
+  
+  const TeamMember._internal({required this.id, user, team, createdAt, updatedAt}): _user = user, _team = team, _createdAt = createdAt, _updatedAt = updatedAt;
+  
+  factory TeamMember({String? id, User? user, Team? team}) {
+    return TeamMember._internal(
+      id: id == null ? amplify_core.UUID.getUUID() : id,
+      user: user,
+      team: team);
+  }
+  
+  bool equals(Object other) {
+    return this == other;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is TeamMember &&
+      id == other.id &&
+      _user == other._user &&
+      _team == other._team;
+  }
+  
+  @override
+  int get hashCode => toString().hashCode;
+  
+  @override
+  String toString() {
+    var buffer = new StringBuffer();
+    
+    buffer.write("TeamMember {");
+    buffer.write("id=" + "$id" + ", ");
+    buffer.write("user=" + (_user != null ? _user!.toString() : "null") + ", ");
+    buffer.write("team=" + (_team != null ? _team!.toString() : "null") + ", ");
+    buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
+    buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
+    buffer.write("}");
+    
+    return buffer.toString();
+  }
+  
+  TeamMember copyWith({User? user, Team? team}) {
+    return TeamMember._internal(
+      id: id,
+      user: user ?? this.user,
+      team: team ?? this.team);
+  }
+  
+  TeamMember copyWithModelFieldValues({
+    ModelFieldValue<User?>? user,
+    ModelFieldValue<Team?>? team
+  }) {
+    return TeamMember._internal(
+      id: id,
+      user: user == null ? this.user : user.value,
+      team: team == null ? this.team : team.value
+    );
+  }
+  
+  TeamMember.fromJson(Map<String, dynamic> json)  
+    : id = json['id'],
+      _user = json['user'] != null
+        ? json['user']['serializedData'] != null
+          ? User.fromJson(new Map<String, dynamic>.from(json['user']['serializedData']))
+          : User.fromJson(new Map<String, dynamic>.from(json['user']))
+        : null,
+      _team = json['team'] != null
+        ? json['team']['serializedData'] != null
+          ? Team.fromJson(new Map<String, dynamic>.from(json['team']['serializedData']))
+          : Team.fromJson(new Map<String, dynamic>.from(json['team']))
+        : null,
+      _createdAt = json['createdAt'] != null ? amplify_core.TemporalDateTime.fromString(json['createdAt']) : null,
+      _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
+  
+  Map<String, dynamic> toJson() => {
+    'id': id, 'user': _user?.toJson(), 'team': _team?.toJson(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+  };
+  
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'user': _user,
+    'team': _team,
+    'createdAt': _createdAt,
+    'updatedAt': _updatedAt
+  };
+
+  static final amplify_core.QueryModelIdentifier<TeamMemberModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<TeamMemberModelIdentifier>();
+  static final ID = amplify_core.QueryField(fieldName: "id");
+  static final USER = amplify_core.QueryField(
+    fieldName: "user",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'User'));
+  static final TEAM = amplify_core.QueryField(
+    fieldName: "team",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'Team'));
+  static var schema = amplify_core.Model.defineSchema(define: (amplify_core.ModelSchemaDefinition modelSchemaDefinition) {
+    modelSchemaDefinition.name = "TeamMember";
+    modelSchemaDefinition.pluralName = "TeamMembers";
+    
+    modelSchemaDefinition.authRules = [
+      amplify_core.AuthRule(
+        authStrategy: amplify_core.AuthStrategy.PUBLIC,
+        provider: amplify_core.AuthRuleProvider.APIKEY,
+        operations: const [
+          amplify_core.ModelOperation.CREATE,
+          amplify_core.ModelOperation.UPDATE,
+          amplify_core.ModelOperation.DELETE,
+          amplify_core.ModelOperation.READ
+        ])
+    ];
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.id());
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.belongsTo(
+      key: TeamMember.USER,
+      isRequired: false,
+      targetNames: ['userId'],
+      ofModelName: 'User'
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.belongsTo(
+      key: TeamMember.TEAM,
+      isRequired: false,
+      targetNames: ['teamId'],
+      ofModelName: 'Team'
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'createdAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'updatedAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+  });
+}
+
+class _TeamMemberModelType extends amplify_core.ModelType<TeamMember> {
+  const _TeamMemberModelType();
+  
+  @override
+  TeamMember fromJson(Map<String, dynamic> jsonData) {
+    return TeamMember.fromJson(jsonData);
+  }
+  
+  @override
+  String modelName() {
+    return 'TeamMember';
+  }
+}
+
+/**
+ * This is an auto generated class representing the model identifier
+ * of [TeamMember] in your schema.
+ */
+class TeamMemberModelIdentifier implements amplify_core.ModelIdentifier<TeamMember> {
+  final String id;
+
+  /** Create an instance of TeamMemberModelIdentifier using [id] the primary key. */
+  const TeamMemberModelIdentifier({
+    required this.id});
+  
+  @override
+  Map<String, dynamic> serializeAsMap() => (<String, dynamic>{
+    'id': id
+  });
+  
+  @override
+  List<Map<String, dynamic>> serializeAsList() => serializeAsMap()
+    .entries
+    .map((entry) => (<String, dynamic>{ entry.key: entry.value }))
+    .toList();
+  
+  @override
+  String serializeAsString() => serializeAsMap().values.join('#');
+  
+  @override
+  String toString() => 'TeamMemberModelIdentifier(id: $id)';
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    
+    return other is TeamMemberModelIdentifier &&
+      id == other.id;
+  }
+  
+  @override
+  int get hashCode =>
+    id.hashCode;
+}
+=== FILE: lib/models/Payment.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'ModelProvider.dart';
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+
+
+/** This is an auto generated class representing the Payment type in your schema. */
+class Payment extends amplify_core.Model {
+  static const classType = const _PaymentModelType();
+  final String id;
+  final double? _amount;
+  final String? _type;
+  final String? _status;
+  final User? _user;
+  final amplify_core.TemporalDateTime? _createdAt;
+  final amplify_core.TemporalDateTime? _updatedAt;
+
+  @override
+  getInstanceType() => classType;
+  
+  @Deprecated('[getId] is being deprecated in favor of custom primary key feature. Use getter [modelIdentifier] to get model identifier.')
+  @override
+  String getId() => id;
+  
+  PaymentModelIdentifier get modelIdentifier {
+      return PaymentModelIdentifier(
+        id: id
+      );
+  }
+  
+  double get amount {
+    try {
+      return _amount!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  String get type {
+    try {
+      return _type!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  String get status {
+    try {
+      return _status!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  User? get user {
+    return _user;
+  }
+  
+  amplify_core.TemporalDateTime? get createdAt {
+    return _createdAt;
+  }
+  
+  amplify_core.TemporalDateTime? get updatedAt {
+    return _updatedAt;
+  }
+  
+  const Payment._internal({required this.id, required amount, required type, required status, user, createdAt, updatedAt}): _amount = amount, _type = type, _status = status, _user = user, _createdAt = createdAt, _updatedAt = updatedAt;
+  
+  factory Payment({String? id, required double amount, required String type, required String status, User? user}) {
+    return Payment._internal(
+      id: id == null ? amplify_core.UUID.getUUID() : id,
+      amount: amount,
+      type: type,
+      status: status,
+      user: user);
+  }
+  
+  bool equals(Object other) {
+    return this == other;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is Payment &&
+      id == other.id &&
+      _amount == other._amount &&
+      _type == other._type &&
+      _status == other._status &&
+      _user == other._user;
+  }
+  
+  @override
+  int get hashCode => toString().hashCode;
+  
+  @override
+  String toString() {
+    var buffer = new StringBuffer();
+    
+    buffer.write("Payment {");
+    buffer.write("id=" + "$id" + ", ");
+    buffer.write("amount=" + (_amount != null ? _amount!.toString() : "null") + ", ");
+    buffer.write("type=" + "$_type" + ", ");
+    buffer.write("status=" + "$_status" + ", ");
+    buffer.write("user=" + (_user != null ? _user!.toString() : "null") + ", ");
+    buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
+    buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
+    buffer.write("}");
+    
+    return buffer.toString();
+  }
+  
+  Payment copyWith({double? amount, String? type, String? status, User? user}) {
+    return Payment._internal(
+      id: id,
+      amount: amount ?? this.amount,
+      type: type ?? this.type,
+      status: status ?? this.status,
+      user: user ?? this.user);
+  }
+  
+  Payment copyWithModelFieldValues({
+    ModelFieldValue<double>? amount,
+    ModelFieldValue<String>? type,
+    ModelFieldValue<String>? status,
+    ModelFieldValue<User?>? user
+  }) {
+    return Payment._internal(
+      id: id,
+      amount: amount == null ? this.amount : amount.value,
+      type: type == null ? this.type : type.value,
+      status: status == null ? this.status : status.value,
+      user: user == null ? this.user : user.value
+    );
+  }
+  
+  Payment.fromJson(Map<String, dynamic> json)  
+    : id = json['id'],
+      _amount = (json['amount'] as num?)?.toDouble(),
+      _type = json['type'],
+      _status = json['status'],
+      _user = json['user'] != null
+        ? json['user']['serializedData'] != null
+          ? User.fromJson(new Map<String, dynamic>.from(json['user']['serializedData']))
+          : User.fromJson(new Map<String, dynamic>.from(json['user']))
+        : null,
+      _createdAt = json['createdAt'] != null ? amplify_core.TemporalDateTime.fromString(json['createdAt']) : null,
+      _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
+  
+  Map<String, dynamic> toJson() => {
+    'id': id, 'amount': _amount, 'type': _type, 'status': _status, 'user': _user?.toJson(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+  };
+  
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'amount': _amount,
+    'type': _type,
+    'status': _status,
+    'user': _user,
+    'createdAt': _createdAt,
+    'updatedAt': _updatedAt
+  };
+
+  static final amplify_core.QueryModelIdentifier<PaymentModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<PaymentModelIdentifier>();
+  static final ID = amplify_core.QueryField(fieldName: "id");
+  static final AMOUNT = amplify_core.QueryField(fieldName: "amount");
+  static final TYPE = amplify_core.QueryField(fieldName: "type");
+  static final STATUS = amplify_core.QueryField(fieldName: "status");
+  static final USER = amplify_core.QueryField(
+    fieldName: "user",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'User'));
+  static var schema = amplify_core.Model.defineSchema(define: (amplify_core.ModelSchemaDefinition modelSchemaDefinition) {
+    modelSchemaDefinition.name = "Payment";
+    modelSchemaDefinition.pluralName = "Payments";
+    
+    modelSchemaDefinition.authRules = [
+      amplify_core.AuthRule(
+        authStrategy: amplify_core.AuthStrategy.PUBLIC,
+        provider: amplify_core.AuthRuleProvider.APIKEY,
+        operations: const [
+          amplify_core.ModelOperation.CREATE,
+          amplify_core.ModelOperation.UPDATE,
+          amplify_core.ModelOperation.DELETE,
+          amplify_core.ModelOperation.READ
+        ])
+    ];
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.id());
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Payment.AMOUNT,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Payment.TYPE,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Payment.STATUS,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.belongsTo(
+      key: Payment.USER,
+      isRequired: false,
+      targetNames: ['userId'],
+      ofModelName: 'User'
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'createdAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'updatedAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+  });
+}
+
+class _PaymentModelType extends amplify_core.ModelType<Payment> {
+  const _PaymentModelType();
+  
+  @override
+  Payment fromJson(Map<String, dynamic> jsonData) {
+    return Payment.fromJson(jsonData);
+  }
+  
+  @override
+  String modelName() {
+    return 'Payment';
+  }
+}
+
+/**
+ * This is an auto generated class representing the model identifier
+ * of [Payment] in your schema.
+ */
+class PaymentModelIdentifier implements amplify_core.ModelIdentifier<Payment> {
+  final String id;
+
+  /** Create an instance of PaymentModelIdentifier using [id] the primary key. */
+  const PaymentModelIdentifier({
+    required this.id});
+  
+  @override
+  Map<String, dynamic> serializeAsMap() => (<String, dynamic>{
+    'id': id
+  });
+  
+  @override
+  List<Map<String, dynamic>> serializeAsList() => serializeAsMap()
+    .entries
+    .map((entry) => (<String, dynamic>{ entry.key: entry.value }))
+    .toList();
+  
+  @override
+  String serializeAsString() => serializeAsMap().values.join('#');
+  
+  @override
+  String toString() => 'PaymentModelIdentifier(id: $id)';
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    
+    return other is PaymentModelIdentifier &&
+      id == other.id;
+  }
+  
+  @override
+  int get hashCode =>
+    id.hashCode;
+}
+=== FILE: lib/models/Game.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'ModelProvider.dart';
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+import 'package:collection/collection.dart';
+
+
+/** This is an auto generated class representing the Game type in your schema. */
+class Game extends amplify_core.Model {
+  static const classType = const _GameModelType();
+  final String id;
+  final amplify_core.TemporalDate? _date;
+  final amplify_core.TemporalTime? _time;
+  final String? _location;
+  final String? _organizerId;
+  final int? _maxPlayers;
+  final double? _appFee;
+  final double? _minimumBalanceRequired;
+  final Team? _team;
+  final List<RSVP>? _rsvps;
+  final amplify_core.TemporalDateTime? _createdAt;
+  final amplify_core.TemporalDateTime? _updatedAt;
+
+  @override
+  getInstanceType() => classType;
+  
+  @Deprecated('[getId] is being deprecated in favor of custom primary key feature. Use getter [modelIdentifier] to get model identifier.')
+  @override
+  String getId() => id;
+  
+  GameModelIdentifier get modelIdentifier {
+      return GameModelIdentifier(
+        id: id
+      );
+  }
+  
+  amplify_core.TemporalDate get date {
+    try {
+      return _date!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  amplify_core.TemporalTime get time {
+    try {
+      return _time!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  String get location {
+    try {
+      return _location!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  String get organizerId {
+    try {
+      return _organizerId!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  int get maxPlayers {
+    try {
+      return _maxPlayers!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  double get appFee {
+    try {
+      return _appFee!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  double get minimumBalanceRequired {
+    try {
+      return _minimumBalanceRequired!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  Team? get team {
+    return _team;
+  }
+  
+  List<RSVP>? get rsvps {
+    return _rsvps;
+  }
+  
+  amplify_core.TemporalDateTime? get createdAt {
+    return _createdAt;
+  }
+  
+  amplify_core.TemporalDateTime? get updatedAt {
+    return _updatedAt;
+  }
+  
+  const Game._internal({required this.id, required date, required time, required location, required organizerId, required maxPlayers, required appFee, required minimumBalanceRequired, team, rsvps, createdAt, updatedAt}): _date = date, _time = time, _location = location, _organizerId = organizerId, _maxPlayers = maxPlayers, _appFee = appFee, _minimumBalanceRequired = minimumBalanceRequired, _team = team, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
+  
+  factory Game({String? id, required amplify_core.TemporalDate date, required amplify_core.TemporalTime time, required String location, required String organizerId, required int maxPlayers, required double appFee, required double minimumBalanceRequired, Team? team, List<RSVP>? rsvps}) {
+    return Game._internal(
+      id: id == null ? amplify_core.UUID.getUUID() : id,
+      date: date,
+      time: time,
+      location: location,
+      organizerId: organizerId,
+      maxPlayers: maxPlayers,
+      appFee: appFee,
+      minimumBalanceRequired: minimumBalanceRequired,
+      team: team,
+      rsvps: rsvps != null ? List<RSVP>.unmodifiable(rsvps) : rsvps);
+  }
+  
+  bool equals(Object other) {
+    return this == other;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is Game &&
+      id == other.id &&
+      _date == other._date &&
+      _time == other._time &&
+      _location == other._location &&
+      _organizerId == other._organizerId &&
+      _maxPlayers == other._maxPlayers &&
+      _appFee == other._appFee &&
+      _minimumBalanceRequired == other._minimumBalanceRequired &&
+      _team == other._team &&
+      DeepCollectionEquality().equals(_rsvps, other._rsvps);
+  }
+  
+  @override
+  int get hashCode => toString().hashCode;
+  
+  @override
+  String toString() {
+    var buffer = new StringBuffer();
+    
+    buffer.write("Game {");
+    buffer.write("id=" + "$id" + ", ");
+    buffer.write("date=" + (_date != null ? _date!.format() : "null") + ", ");
+    buffer.write("time=" + (_time != null ? _time!.format() : "null") + ", ");
+    buffer.write("location=" + "$_location" + ", ");
+    buffer.write("organizerId=" + "$_organizerId" + ", ");
+    buffer.write("maxPlayers=" + (_maxPlayers != null ? _maxPlayers!.toString() : "null") + ", ");
+    buffer.write("appFee=" + (_appFee != null ? _appFee!.toString() : "null") + ", ");
+    buffer.write("minimumBalanceRequired=" + (_minimumBalanceRequired != null ? _minimumBalanceRequired!.toString() : "null") + ", ");
+    buffer.write("team=" + (_team != null ? _team!.toString() : "null") + ", ");
+    buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
+    buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
+    buffer.write("}");
+    
+    return buffer.toString();
+  }
+  
+  Game copyWith({amplify_core.TemporalDate? date, amplify_core.TemporalTime? time, String? location, String? organizerId, int? maxPlayers, double? appFee, double? minimumBalanceRequired, Team? team, List<RSVP>? rsvps}) {
+    return Game._internal(
+      id: id,
+      date: date ?? this.date,
+      time: time ?? this.time,
+      location: location ?? this.location,
+      organizerId: organizerId ?? this.organizerId,
+      maxPlayers: maxPlayers ?? this.maxPlayers,
+      appFee: appFee ?? this.appFee,
+      minimumBalanceRequired: minimumBalanceRequired ?? this.minimumBalanceRequired,
+      team: team ?? this.team,
+      rsvps: rsvps ?? this.rsvps);
+  }
+  
+  Game copyWithModelFieldValues({
+    ModelFieldValue<amplify_core.TemporalDate>? date,
+    ModelFieldValue<amplify_core.TemporalTime>? time,
+    ModelFieldValue<String>? location,
+    ModelFieldValue<String>? organizerId,
+    ModelFieldValue<int>? maxPlayers,
+    ModelFieldValue<double>? appFee,
+    ModelFieldValue<double>? minimumBalanceRequired,
+    ModelFieldValue<Team?>? team,
+    ModelFieldValue<List<RSVP>?>? rsvps
+  }) {
+    return Game._internal(
+      id: id,
+      date: date == null ? this.date : date.value,
+      time: time == null ? this.time : time.value,
+      location: location == null ? this.location : location.value,
+      organizerId: organizerId == null ? this.organizerId : organizerId.value,
+      maxPlayers: maxPlayers == null ? this.maxPlayers : maxPlayers.value,
+      appFee: appFee == null ? this.appFee : appFee.value,
+      minimumBalanceRequired: minimumBalanceRequired == null ? this.minimumBalanceRequired : minimumBalanceRequired.value,
+      team: team == null ? this.team : team.value,
+      rsvps: rsvps == null ? this.rsvps : rsvps.value
+    );
+  }
+  
+  Game.fromJson(Map<String, dynamic> json)  
+    : id = json['id'],
+      _date = json['date'] != null ? amplify_core.TemporalDate.fromString(json['date']) : null,
+      _time = json['time'] != null ? amplify_core.TemporalTime.fromString(json['time']) : null,
+      _location = json['location'],
+      _organizerId = json['organizerId'],
+      _maxPlayers = (json['maxPlayers'] as num?)?.toInt(),
+      _appFee = (json['appFee'] as num?)?.toDouble(),
+      _minimumBalanceRequired = (json['minimumBalanceRequired'] as num?)?.toDouble(),
+      _team = json['team'] != null
+        ? json['team']['serializedData'] != null
+          ? Team.fromJson(new Map<String, dynamic>.from(json['team']['serializedData']))
+          : Team.fromJson(new Map<String, dynamic>.from(json['team']))
+        : null,
+      _rsvps = json['rsvps']  is Map
+        ? (json['rsvps']['items'] is List
+          ? (json['rsvps']['items'] as List)
+              .where((e) => e != null)
+              .map((e) => RSVP.fromJson(new Map<String, dynamic>.from(e)))
+              .toList()
+          : null)
+        : (json['rsvps'] is List
+          ? (json['rsvps'] as List)
+              .where((e) => e?['serializedData'] != null)
+              .map((e) => RSVP.fromJson(new Map<String, dynamic>.from(e?['serializedData'])))
+              .toList()
+          : null),
+      _createdAt = json['createdAt'] != null ? amplify_core.TemporalDateTime.fromString(json['createdAt']) : null,
+      _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
+  
+  Map<String, dynamic> toJson() => {
+    'id': id, 'date': _date?.format(), 'time': _time?.format(), 'location': _location, 'organizerId': _organizerId, 'maxPlayers': _maxPlayers, 'appFee': _appFee, 'minimumBalanceRequired': _minimumBalanceRequired, 'team': _team?.toJson(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+  };
+  
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'date': _date,
+    'time': _time,
+    'location': _location,
+    'organizerId': _organizerId,
+    'maxPlayers': _maxPlayers,
+    'appFee': _appFee,
+    'minimumBalanceRequired': _minimumBalanceRequired,
+    'team': _team,
+    'rsvps': _rsvps,
+    'createdAt': _createdAt,
+    'updatedAt': _updatedAt
+  };
+
+  static final amplify_core.QueryModelIdentifier<GameModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<GameModelIdentifier>();
+  static final ID = amplify_core.QueryField(fieldName: "id");
+  static final DATE = amplify_core.QueryField(fieldName: "date");
+  static final TIME = amplify_core.QueryField(fieldName: "time");
+  static final LOCATION = amplify_core.QueryField(fieldName: "location");
+  static final ORGANIZERID = amplify_core.QueryField(fieldName: "organizerId");
+  static final MAXPLAYERS = amplify_core.QueryField(fieldName: "maxPlayers");
+  static final APPFEE = amplify_core.QueryField(fieldName: "appFee");
+  static final MINIMUMBALANCEREQUIRED = amplify_core.QueryField(fieldName: "minimumBalanceRequired");
+  static final TEAM = amplify_core.QueryField(
+    fieldName: "team",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'Team'));
+  static final RSVPS = amplify_core.QueryField(
+    fieldName: "rsvps",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'RSVP'));
+  static var schema = amplify_core.Model.defineSchema(define: (amplify_core.ModelSchemaDefinition modelSchemaDefinition) {
+    modelSchemaDefinition.name = "Game";
+    modelSchemaDefinition.pluralName = "Games";
+    
+    modelSchemaDefinition.authRules = [
+      amplify_core.AuthRule(
+        authStrategy: amplify_core.AuthStrategy.PUBLIC,
+        provider: amplify_core.AuthRuleProvider.APIKEY,
+        operations: const [
+          amplify_core.ModelOperation.CREATE,
+          amplify_core.ModelOperation.UPDATE,
+          amplify_core.ModelOperation.DELETE,
+          amplify_core.ModelOperation.READ
+        ])
+    ];
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.id());
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.DATE,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.date)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.TIME,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.time)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.LOCATION,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.ORGANIZERID,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.MAXPLAYERS,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.int)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.APPFEE,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.MINIMUMBALANCEREQUIRED,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.belongsTo(
+      key: Game.TEAM,
+      isRequired: false,
+      targetNames: ['teamId'],
+      ofModelName: 'Team'
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.hasMany(
+      key: Game.RSVPS,
+      isRequired: false,
+      ofModelName: 'RSVP',
+      associatedKey: RSVP.GAME
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'createdAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'updatedAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+  });
+}
+
+class _GameModelType extends amplify_core.ModelType<Game> {
+  const _GameModelType();
+  
+  @override
+  Game fromJson(Map<String, dynamic> jsonData) {
+    return Game.fromJson(jsonData);
+  }
+  
+  @override
+  String modelName() {
+    return 'Game';
+  }
+}
+
+/**
+ * This is an auto generated class representing the model identifier
+ * of [Game] in your schema.
+ */
+class GameModelIdentifier implements amplify_core.ModelIdentifier<Game> {
+  final String id;
+
+  /** Create an instance of GameModelIdentifier using [id] the primary key. */
+  const GameModelIdentifier({
+    required this.id});
+  
+  @override
+  Map<String, dynamic> serializeAsMap() => (<String, dynamic>{
+    'id': id
+  });
+  
+  @override
+  List<Map<String, dynamic>> serializeAsList() => serializeAsMap()
+    .entries
+    .map((entry) => (<String, dynamic>{ entry.key: entry.value }))
+    .toList();
+  
+  @override
+  String serializeAsString() => serializeAsMap().values.join('#');
+  
+  @override
+  String toString() => 'GameModelIdentifier(id: $id)';
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    
+    return other is GameModelIdentifier &&
+      id == other.id;
+  }
+  
+  @override
+  int get hashCode =>
+    id.hashCode;
+}
+=== FILE: lib/models/ModelProvider.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+import 'Game.dart';
+import 'Payment.dart';
+import 'RSVP.dart';
+import 'Team.dart';
+import 'TeamMember.dart';
+import 'User.dart';
+import 'Venue.dart';
+
+export 'Game.dart';
+export 'Payment.dart';
+export 'RSVP.dart';
+export 'Team.dart';
+export 'TeamMember.dart';
+export 'User.dart';
+export 'Venue.dart';
+
+class ModelProvider implements amplify_core.ModelProviderInterface {
+  @override
+  String version = "83badb847b2647977e0fcdf32fefc45e";
+  @override
+  List<amplify_core.ModelSchema> modelSchemas = [Game.schema, Payment.schema, RSVP.schema, Team.schema, TeamMember.schema, User.schema, Venue.schema];
+  @override
+  List<amplify_core.ModelSchema> customTypeSchemas = [];
+  static final ModelProvider _instance = ModelProvider();
+
+  static ModelProvider get instance => _instance;
+  
+  amplify_core.ModelType getModelTypeByModelName(String modelName) {
+    switch(modelName) {
+      case "Game":
+        return Game.classType;
+      case "Payment":
+        return Payment.classType;
+      case "RSVP":
+        return RSVP.classType;
+      case "Team":
+        return Team.classType;
+      case "TeamMember":
+        return TeamMember.classType;
+      case "User":
+        return User.classType;
+      case "Venue":
+        return Venue.classType;
+      default:
+        throw Exception("Failed to find model in model provider for model name: " + modelName);
+    }
+  }
+}
+
+
+class ModelFieldValue<T> {
+  const ModelFieldValue.value(this.value);
+
+  final T value;
+}
+
+=== FILE: lib/models/RSVP.dart ===
+
+/*
+* Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
+
+// NOTE: This file is generated and may not follow lint rules defined in your app
+// Generated files can be excluded from analysis in analysis_options.yaml
+// For more info, see: https://dart.dev/guides/language/analysis-options#excluding-code-from-analysis
+
+// ignore_for_file: public_member_api_docs, annotate_overrides, dead_code, dead_codepublic_member_api_docs, depend_on_referenced_packages, file_names, library_private_types_in_public_api, no_leading_underscores_for_library_prefixes, no_leading_underscores_for_local_identifiers, non_constant_identifier_names, null_check_on_nullable_type_parameter, override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_const_constructors, prefer_if_null_operators, prefer_interpolation_to_compose_strings, slash_for_doc_comments, sort_child_properties_last, unnecessary_const, unnecessary_constructor_name, unnecessary_late, unnecessary_new, unnecessary_null_aware_assignments, unnecessary_nullable_for_final_variable_declarations, unnecessary_string_interpolations, use_build_context_synchronously
+
+import 'ModelProvider.dart';
+import 'package:amplify_core/amplify_core.dart' as amplify_core;
+
+
+/** This is an auto generated class representing the RSVP type in your schema. */
+class RSVP extends amplify_core.Model {
+  static const classType = const _RSVPModelType();
+  final String id;
+  final String? _status;
+  final Game? _game;
+  final User? _user;
+  final amplify_core.TemporalDateTime? _createdAt;
+  final amplify_core.TemporalDateTime? _updatedAt;
+
+  @override
+  getInstanceType() => classType;
+  
+  @Deprecated('[getId] is being deprecated in favor of custom primary key feature. Use getter [modelIdentifier] to get model identifier.')
+  @override
+  String getId() => id;
+  
+  RSVPModelIdentifier get modelIdentifier {
+      return RSVPModelIdentifier(
+        id: id
+      );
+  }
+  
+  String get status {
+    try {
+      return _status!;
+    } catch(e) {
+      throw amplify_core.AmplifyCodeGenModelException(
+          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
+          recoverySuggestion:
+            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
+          underlyingException: e.toString()
+          );
+    }
+  }
+  
+  Game? get game {
+    return _game;
+  }
+  
+  User? get user {
+    return _user;
+  }
+  
+  amplify_core.TemporalDateTime? get createdAt {
+    return _createdAt;
+  }
+  
+  amplify_core.TemporalDateTime? get updatedAt {
+    return _updatedAt;
+  }
+  
+  const RSVP._internal({required this.id, required status, game, user, createdAt, updatedAt}): _status = status, _game = game, _user = user, _createdAt = createdAt, _updatedAt = updatedAt;
+  
+  factory RSVP({String? id, required String status, Game? game, User? user}) {
+    return RSVP._internal(
+      id: id == null ? amplify_core.UUID.getUUID() : id,
+      status: status,
+      game: game,
+      user: user);
+  }
+  
+  bool equals(Object other) {
+    return this == other;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is RSVP &&
+      id == other.id &&
+      _status == other._status &&
+      _game == other._game &&
+      _user == other._user;
+  }
+  
+  @override
+  int get hashCode => toString().hashCode;
+  
+  @override
+  String toString() {
+    var buffer = new StringBuffer();
+    
+    buffer.write("RSVP {");
+    buffer.write("id=" + "$id" + ", ");
+    buffer.write("status=" + "$_status" + ", ");
+    buffer.write("game=" + (_game != null ? _game!.toString() : "null") + ", ");
+    buffer.write("user=" + (_user != null ? _user!.toString() : "null") + ", ");
+    buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
+    buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
+    buffer.write("}");
+    
+    return buffer.toString();
+  }
+  
+  RSVP copyWith({String? status, Game? game, User? user}) {
+    return RSVP._internal(
+      id: id,
+      status: status ?? this.status,
+      game: game ?? this.game,
+      user: user ?? this.user);
+  }
+  
+  RSVP copyWithModelFieldValues({
+    ModelFieldValue<String>? status,
+    ModelFieldValue<Game?>? game,
+    ModelFieldValue<User?>? user
+  }) {
+    return RSVP._internal(
+      id: id,
+      status: status == null ? this.status : status.value,
+      game: game == null ? this.game : game.value,
+      user: user == null ? this.user : user.value
+    );
+  }
+  
+  RSVP.fromJson(Map<String, dynamic> json)  
+    : id = json['id'],
+      _status = json['status'],
+      _game = json['game'] != null
+        ? json['game']['serializedData'] != null
+          ? Game.fromJson(new Map<String, dynamic>.from(json['game']['serializedData']))
+          : Game.fromJson(new Map<String, dynamic>.from(json['game']))
+        : null,
+      _user = json['user'] != null
+        ? json['user']['serializedData'] != null
+          ? User.fromJson(new Map<String, dynamic>.from(json['user']['serializedData']))
+          : User.fromJson(new Map<String, dynamic>.from(json['user']))
+        : null,
+      _createdAt = json['createdAt'] != null ? amplify_core.TemporalDateTime.fromString(json['createdAt']) : null,
+      _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
+  
+  Map<String, dynamic> toJson() => {
+    'id': id, 'status': _status, 'game': _game?.toJson(), 'user': _user?.toJson(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+  };
+  
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'status': _status,
+    'game': _game,
+    'user': _user,
+    'createdAt': _createdAt,
+    'updatedAt': _updatedAt
+  };
+
+  static final amplify_core.QueryModelIdentifier<RSVPModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<RSVPModelIdentifier>();
+  static final ID = amplify_core.QueryField(fieldName: "id");
+  static final STATUS = amplify_core.QueryField(fieldName: "status");
+  static final GAME = amplify_core.QueryField(
+    fieldName: "game",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'Game'));
+  static final USER = amplify_core.QueryField(
+    fieldName: "user",
+    fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'User'));
+  static var schema = amplify_core.Model.defineSchema(define: (amplify_core.ModelSchemaDefinition modelSchemaDefinition) {
+    modelSchemaDefinition.name = "RSVP";
+    modelSchemaDefinition.pluralName = "RSVPS";
+    
+    modelSchemaDefinition.authRules = [
+      amplify_core.AuthRule(
+        authStrategy: amplify_core.AuthStrategy.PUBLIC,
+        provider: amplify_core.AuthRuleProvider.APIKEY,
+        operations: const [
+          amplify_core.ModelOperation.CREATE,
+          amplify_core.ModelOperation.UPDATE,
+          amplify_core.ModelOperation.DELETE,
+          amplify_core.ModelOperation.READ
+        ])
+    ];
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.id());
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: RSVP.STATUS,
+      isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.belongsTo(
+      key: RSVP.GAME,
+      isRequired: false,
+      targetNames: ['gameId'],
+      ofModelName: 'Game'
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.belongsTo(
+      key: RSVP.USER,
+      isRequired: false,
+      targetNames: ['userId'],
+      ofModelName: 'User'
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'createdAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.nonQueryField(
+      fieldName: 'updatedAt',
+      isRequired: false,
+      isReadOnly: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.dateTime)
+    ));
+  });
+}
+
+class _RSVPModelType extends amplify_core.ModelType<RSVP> {
+  const _RSVPModelType();
+  
+  @override
+  RSVP fromJson(Map<String, dynamic> jsonData) {
+    return RSVP.fromJson(jsonData);
+  }
+  
+  @override
+  String modelName() {
+    return 'RSVP';
+  }
+}
+
+/**
+ * This is an auto generated class representing the model identifier
+ * of [RSVP] in your schema.
+ */
+class RSVPModelIdentifier implements amplify_core.ModelIdentifier<RSVP> {
+  final String id;
+
+  /** Create an instance of RSVPModelIdentifier using [id] the primary key. */
+  const RSVPModelIdentifier({
+    required this.id});
+  
+  @override
+  Map<String, dynamic> serializeAsMap() => (<String, dynamic>{
+    'id': id
+  });
+  
+  @override
+  List<Map<String, dynamic>> serializeAsList() => serializeAsMap()
+    .entries
+    .map((entry) => (<String, dynamic>{ entry.key: entry.value }))
+    .toList();
+  
+  @override
+  String serializeAsString() => serializeAsMap().values.join('#');
+  
+  @override
+  String toString() => 'RSVPModelIdentifier(id: $id)';
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    
+    return other is RSVPModelIdentifier &&
+      id == other.id;
+  }
+  
+  @override
+  int get hashCode =>
+    id.hashCode;
+}
+=== FILE: lib/main.dart ===
+
+import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_api/amplify_api.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
+
+import 'amplify_outputs.dart';
+
+import 'package:amplify_authenticator/amplify_authenticator.dart';
+import 'package:moneyballer/features/scheduling/dashboard_screen.dart';
+import 'package:moneyballer/models/ModelProvider.dart';
+
+void main() {
+  runApp(const MoneyBallerApp());
+}
+
+class MoneyBallerApp extends StatefulWidget {
+  const MoneyBallerApp({super.key});
+
+  @override
+  State<MoneyBallerApp> createState() => _MoneyBallerAppState();
+}
+
+class _MoneyBallerAppState extends State<MoneyBallerApp> {
+  bool _isAmplifyConfigured = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _configureAmplify();
+  }
+
+  Future<void> _configureAmplify() async {
+    try {
+      // 1. Safely handle hot restarts by checking if plugins are already loaded
+      if (!Amplify.isConfigured) {
+        final auth = AmplifyAuthCognito();
+        // Tell the API plugin to use your newly generated Gen 2 models
+        final api = AmplifyAPI(
+          options: APIPluginOptions(modelProvider: ModelProvider.instance),
+        );
+
+        await Amplify.addPlugins([auth, api]);
+        await Amplify.configure(amplifyConfig);
+      }
+
+      // 2. Safely reveal the UI
+      setState(() {
+        _isAmplifyConfigured = true;
+      });
+      safePrint('Successfully configured Amplify with Gen 2 Sandbox!');
+    } on Exception catch (e) {
+      safePrint('An error occurred configuring Amplify: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 1. Show a loading spinner while Amplify configures in the background
+    if (!_isAmplifyConfigured) {
+      return const MaterialApp(
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
+    // 2. Once configured, render the Authenticator and the main app
+    return Authenticator(
+      child: MaterialApp(
+        builder: Authenticator.builder(),
+        title: 'MoneyBaller',
+        theme: ThemeData(primarySwatch: Colors.blue),
+        // Drop your new dashboard right here!
+        home: const DashboardScreen(),
+      ),
+    );
+  }
+}
+
+=== FILE: amplify/auth/resource.ts ===
+
+// amplify/auth/resource.ts
+import { defineAuth } from '@aws-amplify/backend';
+import { postConfirmation } from './post-confirmation/resource';
+
+export const auth = defineAuth({
+  loginWith: {
+    email: true,
+  },
+  // Wire up the new trigger here
+  triggers: {
+    postConfirmation,
+  },
+});
+=== FILE: amplify/auth/post-confirmation/resource.ts ===
+
+// amplify/auth/post-confirmation/resource.ts
+import { defineFunction } from '@aws-amplify/backend';
+
+export const postConfirmation = defineFunction({
+    name: 'post-confirmation',
+});
+=== FILE: amplify/auth/post-confirmation/handler.ts ===
+
+// amplify/auth/post-confirmation/handler.ts
+import type { PostConfirmationTriggerHandler } from 'aws-lambda';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+
+const client = new DynamoDBClient();
+const docClient = DynamoDBDocumentClient.from(client);
+
+export const handler: PostConfirmationTriggerHandler = async (event) => {
+    if (event.request.userAttributes) {
+        const { sub, email, name } = event.request.userAttributes;
+
+        // Create the new User record based on your Gen 2 schema[cite: 1]
+        const command = new PutCommand({
+            TableName: process.env.USER_TABLE_NAME, // Injected via backend.ts
+            Item: {
+                id: sub,
+                __typename: 'User',
+                email: email,
+                name: name || 'New Player',
+                walletBalance: 0.0, // Initialize empty wallet for RSVPs[cite: 1]
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            },
+        });
+
+        try {
+            await docClient.send(command);
+            console.log(`Successfully created DynamoDB User record for ${sub}`);
+        } catch (error) {
+            console.error(`Error syncing user to DynamoDB: ${error}`);
+        }
+    }
+
+    return event;
+};
+=== FILE: amplify/package.json ===
+
+{
+  "type": "module"
+}
+=== FILE: amplify/tsconfig.json ===
+
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "types": [
+      "node"
+    ],
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "paths": {
+      "$amplify/*": [
+        "../.amplify/generated/*"
+      ]
+    }
+  }
+}
+=== FILE: amplify/backend.ts ===
+
+import { defineBackend } from '@aws-amplify/backend';
+import { auth } from './auth/resource';
+import { data } from './data/resource';
+import { postConfirmation } from './auth/post-confirmation/resource'; // 1. Import it directly
+
+const backend = defineBackend({
+  auth,
+  data,
+  postConfirmation, // 2. Register it as a top-level function
+});
+
+// 3. Extract the guaranteed physical Lambda reference
+const postConfirmationLambda = backend.postConfirmation.resources.lambda as any;
+const userTable = backend.data.resources.tables['User'];
+
+if (postConfirmationLambda && userTable) {
+  // 4. Grant permissions and inject the environment variable securely
+  userTable.grantWriteData(postConfirmationLambda);
+  postConfirmationLambda.addEnvironment('USER_TABLE_NAME', userTable.tableName);
+}
+=== FILE: amplify/data/resource.ts ===
+
+import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+
+const schema = a.schema({
+  User: a.model({
+    name: a.string().required(),
+    email: a.string().required(),
+    role: a.string(),
+    walletBalance: a.float().required(), // Stores credits / debits
+    teams: a.hasMany('TeamMember', 'userId'),
+    payments: a.hasMany('Payment', 'userId'),
+    rsvps: a.hasMany('RSVP', 'userId'),
+  }).authorization(allow => [allow.publicApiKey()]),
+
+  Team: a.model({
+    name: a.string().required(),
+    members: a.hasMany('TeamMember', 'teamId'),
+    games: a.hasMany('Game', 'teamId'),
+  }).authorization(allow => [allow.publicApiKey()]),
+
+  TeamMember: a.model({
+    userId: a.id().required(),
+    teamId: a.id().required(),
+    user: a.belongsTo('User', 'userId'),
+    team: a.belongsTo('Team', 'teamId'),
+  }).authorization(allow => [allow.publicApiKey()]),
+
+  Game: a.model({
+    date: a.date().required(),
+    time: a.time().required(),
+    location: a.string().required(),
+    organizerId: a.id().required(),
+    maxPlayers: a.integer().required(),
+    appFee: a.float().required(), // Total upfront fee ($1.99 or $2.99)
+    minimumBalanceRequired: a.float().required(), // Minimum wallet balance for player to join
+    teamId: a.id(),
+    team: a.belongsTo('Team', 'teamId'),
+    rsvps: a.hasMany('RSVP', 'gameId'),
+  }).authorization(allow => [allow.publicApiKey()]),
+
+  Venue: a.model({
+    name: a.string().required(),
+    address: a.string().required(),
+  }).authorization(allow => [allow.publicApiKey()]),
+
+  RSVP: a.model({
+    status: a.string().required(), // 'Going', 'Not Going'
+    gameId: a.id().required(),
+    userId: a.id().required(),
+    game: a.belongsTo('Game', 'gameId'),
+    user: a.belongsTo('User', 'userId'),
+  }).authorization(allow => [allow.publicApiKey()]),
+
+  Payment: a.model({
+    amount: a.float().required(),
+    type: a.string().required(), // 'Organizer Fee Debit', 'Player Fee Share', 'Organizer Reimbursement'
+    status: a.string().required(), // 'Completed', 'Pending'
+    userId: a.id().required(),
+    user: a.belongsTo('User', 'userId'),
+  }).authorization(allow => [allow.publicApiKey()]),
+});
+
+export type Schema = ClientSchema<typeof schema>;
+
+export const data = defineData({
+  schema,
+  authorizationModes: {
+    defaultAuthorizationMode: 'apiKey',
+    apiKeyAuthorizationMode: { expiresInDays: 30 },
+  },
+});
