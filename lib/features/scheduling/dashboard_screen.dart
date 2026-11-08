@@ -4,6 +4,7 @@ import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_api/amplify_api.dart';
 import 'package:moneyballer/models/ModelProvider.dart';
 import 'package:moneyballer/features/scheduling/create_game_screen.dart';
+import 'package:moneyballer/features/scheduling/event_details_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -105,6 +106,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),
                       child: _buildEventCard(
+                        game: game,
                         title: 'Game (${game.maxPlayers} Max)',
                         date:
                             '${game.date.format()} at ${game.time.format().substring(0, 5)}',
@@ -135,62 +137,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEventCard({
+    required Game game,
     required String title,
     required String date,
     required String location,
   }) {
-    return Card(
-      elevation: 6,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EventDetailsScreen(game: game),
+          ),
+        );
+      },
+      child: Card(
+        elevation: 6,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today,
-                  size: 24,
-                  color: Colors.black87,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  date,
-                  style: const TextStyle(
-                    fontSize: 20,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today,
+                    size: 24,
                     color: Colors.black87,
-                    fontWeight: FontWeight.w600,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.location_on, size: 24, color: Colors.black87),
-                const SizedBox(width: 12),
-                Text(
-                  location,
-                  style: const TextStyle(
-                    fontSize: 20,
+                  const SizedBox(width: 12),
+                  Text(
+                    date,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_on,
+                    size: 24,
                     color: Colors.black87,
-                    fontWeight: FontWeight.w600,
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  Text(
+                    location,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

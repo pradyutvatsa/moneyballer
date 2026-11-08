@@ -62,33 +62,38 @@ class EventDetailsScreen extends StatelessWidget {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
+                    // 1. Calculate player's equal share of the upfront fee
                     final double playerShare = game.maxPlayers > 0
-                        ? (game.appFee) / game.maxPlayers
+                        ? game.appFee / game.maxPlayers
                         : 0.0;
 
                     try {
+                      // 2. Fetch authenticated Cognito User
                       final authUser = await Amplify.Auth.getCurrentUser();
                       final userId = authUser.userId;
 
-                      final playerRequest = ModelQueries.list(
+                      // 3. Fetch joining Player's profile directly
+                      final playerRequest = ModelQueries.get(
                         User.classType,
-                        where: User.ID.eq(userId),
+                        UserModelIdentifier(id: userId),
                       );
                       final playerResponse = await Amplify.API
                           .query(request: playerRequest)
                           .response;
-                      final players = playerResponse.data?.items;
+                      final player = playerResponse.data;
 
-                      if (players == null || players.isEmpty) return;
-                      final player = players.first;
-                      if (player == null) return;
+                      if (player == null) {
+                        safePrint('Player profile not found.');
+                        return;
+                      }
 
+                      // 4. Verify player has sufficient funds
                       if (player.walletBalance < playerShare) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Insufficient funds. Top up \$$playerShare',
+                                'Insufficient funds. Please top up \$$playerShare to RSVP.',
                               ),
                               backgroundColor: Colors.red,
                             ),
@@ -96,7 +101,7 @@ class EventDetailsScreen extends StatelessWidget {
                         }
                         return;
                       }
-
+                      // 5. Deduct fee from Player's wallet
                       final updatedPlayer = player.copyWith(
                         walletBalance: player.walletBalance - playerShare,
                       );
@@ -104,19 +109,17 @@ class EventDetailsScreen extends StatelessWidget {
                           .mutate(request: ModelMutations.update(updatedPlayer))
                           .response;
 
-                      final orgRequest = ModelQueries.list(
+                      // 6. Fetch and Reimburse Organizer's wallet
+                      final orgRequest = ModelQueries.get(
                         User.classType,
-                        where: User.ID.eq(game.organizerId),
+                        UserModelIdentifier(id: game.organizerId),
                       );
                       final orgResponse = await Amplify.API
                           .query(request: orgRequest)
                           .response;
-                      final organizers = orgResponse.data?.items;
+                      final organizer = orgResponse.data;
 
-                      if (organizers != null &&
-                          organizers.isNotEmpty &&
-                          organizers.first != null) {
-                        final organizer = organizers.first!;
+                      if (organizer != null) {
                         final updatedOrganizer = organizer.copyWith(
                           walletBalance: organizer.walletBalance + playerShare,
                         );
@@ -125,8 +128,20 @@ class EventDetailsScreen extends StatelessWidget {
                               request: ModelMutations.update(updatedOrganizer),
                             )
                             .response;
+
+                        // Generate Organizer Reimbursement Payment Record
+                        final orgPayment = Payment(
+                          amount: playerShare,
+                          type: 'Organizer Reimbursement',
+                          status: 'Completed',
+                          user: updatedOrganizer,
+                        );
+                        await Amplify.API
+                            .mutate(request: ModelMutations.create(orgPayment))
+                            .response;
                       }
 
+                      // 7. Generate Player Payment record for audit trails
                       final playerPayment = Payment(
                         amount: playerShare,
                         type: 'RSVP Fee Debit',
@@ -137,22 +152,31 @@ class EventDetailsScreen extends StatelessWidget {
                           .mutate(request: ModelMutations.create(playerPayment))
                           .response;
 
+                      // 8. Create RSVP record
                       final newRsvp = RSVP(
                         status: 'Going',
                         game: game,
                         user: updatedPlayer,
                       );
+
                       final rsvpResponse = await Amplify.API
                           .mutate(request: ModelMutations.create(newRsvp))
                           .response;
 
-                      if (!rsvpResponse.hasErrors && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('You are marked as GOING!'),
-                            backgroundColor: Colors.green,
-                          ),
+                      if (rsvpResponse.hasErrors) {
+                        safePrint('RSVP errors: ${rsvpResponse.errors}');
+                      } else {
+                        safePrint(
+                          'Successfully RSVPd and \$$playerShare deducted!',
                         );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('You are marked as GOING!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
                       }
                     } on ApiException catch (e) {
                       safePrint('RSVP Transaction failed: $e');
@@ -180,31 +204,33 @@ class EventDetailsScreen extends StatelessWidget {
                   ),
                   onPressed: () async {
                     try {
+                      // 1. Fetch currently authenticated Cognito user
                       final authUser = await Amplify.Auth.getCurrentUser();
                       final userId = authUser.userId;
 
-                      final userRequest = ModelQueries.list(
+                      // 2. Fetch joining Player's profile directly
+                      final userRequest = ModelQueries.get(
                         User.classType,
-                        where: User.ID.eq(userId),
+                        UserModelIdentifier(id: userId),
                       );
                       final userResponse = await Amplify.API
                           .query(request: userRequest)
                           .response;
-                      final users = userResponse.data?.items;
+                      final player = userResponse.data;
 
-                      if (users == null ||
-                          users.isEmpty ||
-                          users.first == null) {
+                      if (player == null) {
+                        safePrint('Error: Player profile not found.');
                         return;
                       }
-                      final player = users.first!;
 
+                      // 3. Create RSVP record for declining
                       final newRsvp = RSVP(
                         status: 'Not Going',
                         game: game,
                         user: player,
                       );
 
+                      // 4. Save to DynamoDB
                       final request = ModelMutations.create(newRsvp);
                       final response = await Amplify.API
                           .mutate(request: request)
@@ -217,6 +243,7 @@ class EventDetailsScreen extends StatelessWidget {
                           'RSVP NOT GOING recorded for ${player.name}!',
                         );
 
+                        // 5. Display orange warning Snackbar
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(

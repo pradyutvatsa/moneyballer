@@ -1,40 +1,36 @@
 import type { PostConfirmationTriggerHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { type Schema } from '../../data/resource';
+import { Amplify } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/data';
+import { getAmplifyDataClientConfig } from '@aws-amplify/backend/function/runtime';
+import { env } from '$amplify/env/post-confirmation';
 
-const client = new DynamoDBClient();
-const docClient = DynamoDBDocumentClient.from(client);
+// Initialize the Amplify Data client using the auto-injected AppSync environment variables
+const { resourceConfig, libraryOptions } = await getAmplifyDataClientConfig(env);
+Amplify.configure(resourceConfig, libraryOptions);
+
+const client = generateClient<Schema>();
 
 export const handler: PostConfirmationTriggerHandler = async (event) => {
     if (event.request.userAttributes) {
         const { sub, email, name } = event.request.userAttributes;
-        const tableName = process.env.USER_TABLE_NAME;
-
-        if (!tableName) {
-            console.error('CRITICAL: USER_TABLE_NAME environment variable is undefined.');
-            return event;
-        }
-
-        const now = new Date().toISOString();
-
-        const command = new PutCommand({
-            TableName: tableName,
-            Item: {
-                id: sub,
-                __typename: 'User',
-                email: email,
-                name: name || 'New Player',
-                walletBalance: 0.0,
-                createdAt: now,
-                updatedAt: now,
-            },
-        });
 
         try {
-            await docClient.send(command);
-            console.log(`Successfully synced user ${sub} to DynamoDB table ${tableName}`);
+            // Create the user securely through the AppSync GraphQL API
+            const { errors, data: newUser } = await client.models.User.create({
+                id: sub,
+                name: name || 'New Player',
+                email: email,
+                walletBalance: 0.0,
+            });
+
+            if (errors) {
+                console.error('Errors creating User in AppSync:', errors);
+            } else {
+                console.log(`Successfully synced user ${sub} via AppSync`);
+            }
         } catch (error) {
-            console.error(`Error syncing user to DynamoDB: ${error}`);
+            console.error('Error executing User create mutation:', error);
         }
     }
 
