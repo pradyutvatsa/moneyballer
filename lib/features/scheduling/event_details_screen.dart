@@ -184,11 +184,15 @@ class EventDetailsScreen extends StatelessWidget {
                   },
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      'GOING',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'GOING',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        maxLines: 1,
                       ),
                     ),
                   ),
@@ -259,11 +263,15 @@ class EventDetailsScreen extends StatelessWidget {
                   },
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      'NOT GOING',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'NOT GOING',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        maxLines: 1,
                       ),
                     ),
                   ),
