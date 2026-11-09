@@ -8,49 +8,78 @@ class EventDetailsScreen extends StatelessWidget {
 
   const EventDetailsScreen({super.key, required this.game});
 
+  // Premium Color Palette
+  static const Color _crispWhite = Color(0xFFFAF7F2);
+  static const Color _deepBlack = Color(0xFF0F0F0F);
+  static const Color _champagneGold = Color(0xFFC2A878);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: _crispWhite,
       appBar: AppBar(
+        backgroundColor: _crispWhite,
+        elevation: 0,
+        foregroundColor: _deepBlack,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: _deepBlack,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
           'Event Details',
-          style: TextStyle(fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 2.0,
+          ),
         ),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        centerTitle: true,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
         children: [
           Text(
-            'Game (${game.maxPlayers} Max)',
+            'Game Session'.toUpperCase(),
             style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w900,
-              color: Colors.black,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _champagneGold,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${game.maxPlayers} Max Players',
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w300,
+              color: _deepBlack,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 48),
+
+          _buildInfoRow(Icons.calendar_today_outlined, game.date.format()),
+          _buildInfoRow(Icons.access_time, game.time.format().substring(0, 5)),
+          _buildInfoRow(Icons.location_on_outlined, game.location),
+
+          const SizedBox(height: 24),
+          const Divider(color: Colors.grey, thickness: 0.5, height: 60),
+
+          Text(
+            'RSVP STATUS',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _champagneGold,
+              letterSpacing: 1.5,
             ),
           ),
           const SizedBox(height: 24),
-
-          _buildInfoRow(Icons.calendar_today, game.date.format()),
-          const SizedBox(height: 16),
-
-          _buildInfoRow(Icons.access_time, game.time.format().substring(0, 5)),
-          const SizedBox(height: 16),
-
-          _buildInfoRow(Icons.location_on, game.location),
-          const SizedBox(height: 40),
-
-          const Text(
-            'RSVP Status',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 16),
 
           // RSVP Action Buttons
           Row(
@@ -58,13 +87,17 @@ class EventDetailsScreen extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: _deepBlack,
                     foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                   onPressed: () async {
                     // 1. Calculate player's equal share of the upfront fee
                     final double playerShare = game.maxPlayers > 0
-                        ? game.appFee / game.maxPlayers
+                        ? (game.appFee) / game.maxPlayers
                         : 0.0;
 
                     try {
@@ -101,6 +134,7 @@ class EventDetailsScreen extends StatelessWidget {
                         }
                         return;
                       }
+
                       // 5. Deduct fee from Player's wallet
                       final updatedPlayer = player.copyWith(
                         walletBalance: player.walletBalance - playerShare,
@@ -183,14 +217,15 @@ class EventDetailsScreen extends StatelessWidget {
                     }
                   },
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
+                    padding: EdgeInsets.symmetric(vertical: 22),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
                         'GOING',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2.0,
                         ),
                         maxLines: 1,
                       ),
@@ -202,9 +237,13 @@ class EventDetailsScreen extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Colors.black, width: 2),
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: _deepBlack,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      side: const BorderSide(color: _champagneGold, width: 1.5),
+                    ),
                   ),
                   onPressed: () async {
                     try {
@@ -262,14 +301,15 @@ class EventDetailsScreen extends StatelessWidget {
                     }
                   },
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
+                    padding: EdgeInsets.symmetric(vertical: 22),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
                         'NOT GOING',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2.0,
                         ),
                         maxLines: 1,
                       ),
@@ -285,21 +325,25 @@ class EventDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 32, color: Colors.black87),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 28.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 22, color: _champagneGold),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w400,
+                color: _deepBlack,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

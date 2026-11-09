@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:amplify_authenticator/amplify_authenticator.dart';
+//import 'package:amplify_authenticator/amplify_authenticator.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_api/amplify_api.dart';
 import 'package:moneyballer/models/ModelProvider.dart';
@@ -17,6 +17,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Game> _games = [];
   bool _isLoading = true;
 
+  // Premium Color Palette
+  static const Color _crispWhite = Color(0xFFFAF7F2);
+  static const Color _deepBlack = Color(0xFF0F0F0F);
+  static const Color _champagneGold = Color(0xFFC2A878);
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +31,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _fetchGames() async {
     try {
       if (!mounted) return;
-      setState(() => _isLoading = true);
+
+      setState(() {
+        _isLoading = true;
+      });
 
       final request = ModelQueries.list(Game.classType);
       final response = await Amplify.API.query(request: request).response;
@@ -36,11 +44,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       final items = response.data?.items;
-      safePrint('Raw items received: ${items?.length}');
 
       if (items != null) {
         final fetchedGames = items.whereType<Game>().toList();
-        safePrint('Parsed ${fetchedGames.length} valid games!');
 
         if (mounted) {
           setState(() {
@@ -58,56 +64,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } on ApiException catch (e) {
       safePrint('Query failed: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: _crispWhite,
       appBar: AppBar(
+        backgroundColor: _crispWhite,
+        elevation: 0,
+        foregroundColor: _deepBlack,
         title: const Text(
           'MoneyBaller',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 2.0,
+          ),
         ),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        actions: const [SignOutButton()],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, size: 22, color: _champagneGold),
+            onPressed: () async {
+              try {
+                await Amplify.Auth.signOut();
+              } catch (e) {
+                safePrint('Error signing out: $e');
+              }
+            },
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.black))
+          ? const Center(
+              child: CircularProgressIndicator(color: _champagneGold),
+            )
           : RefreshIndicator(
               onRefresh: _fetchGames,
-              color: Colors.black,
+              color: _champagneGold,
               child: ListView(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 32.0,
+                ),
                 children: [
                   const Text(
                     'Upcoming Games',
                     style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w400,
+                      color: _deepBlack,
+                      letterSpacing: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   if (_games.isEmpty)
                     const Padding(
                       padding: EdgeInsets.only(top: 40.0),
                       child: Center(
                         child: Text(
                           'No games scheduled yet.',
-                          style: TextStyle(fontSize: 20, color: Colors.grey),
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w300,
+                          ),
                         ),
                       ),
                     ),
                   for (final game in _games) ...[
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
+                      padding: const EdgeInsets.only(
+                        bottom: 24.0,
+                      ), // Generous whitespace
                       child: _buildEventCard(
                         game: game,
-                        title: 'Game (${game.maxPlayers} Max)',
+                        title: 'Game Session (${game.maxPlayers} Max)',
                         date:
                             '${game.date.format()} at ${game.time.format().substring(0, 5)}',
                         location: game.location,
@@ -125,12 +162,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
           await _fetchGames();
         },
-        backgroundColor: Colors.black,
+        backgroundColor: _champagneGold,
+        elevation: 0, // Flat styling
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add, size: 28),
+        icon: const Icon(Icons.add, size: 24),
         label: const Text(
           'Create Game',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+          ),
         ),
       ),
     );
@@ -151,63 +193,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       },
-      child: Card(
-        elevation: 6,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4), // Clean geometric edges
+          border: Border.all(
+            color: Colors.grey.shade200,
+          ), // Subtle stroke instead of shadow
+        ),
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _champagneGold,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 20,
+                  color: _deepBlack,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today,
-                    size: 24,
-                    color: Colors.black87,
+                const SizedBox(width: 16),
+                Text(
+                  date,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: _deepBlack,
+                    fontWeight: FontWeight.w400,
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    date,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                    ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 20,
+                  color: _deepBlack,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  location,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: _deepBlack,
+                    fontWeight: FontWeight.w400,
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_on,
-                    size: 24,
-                    color: Colors.black87,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    location,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

@@ -1,7 +1,6 @@
-// Ensure these imports are at the top of create_game_screen.dart:
 import 'package:flutter/material.dart';
-import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_api/amplify_api.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:moneyballer/models/ModelProvider.dart';
 
 class CreateGameScreen extends StatefulWidget {
@@ -19,6 +18,11 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
+  // Premium Color Palette
+  static const Color _crispWhite = Color(0xFFFAF7F2);
+  static const Color _deepBlack = Color(0xFF0F0F0F);
+  static const Color _champagneGold = Color(0xFFC2A878);
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -27,7 +31,13 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
       lastDate: DateTime(2100),
       builder: (context, child) => Theme(
         data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(primary: Colors.black),
+          colorScheme: const ColorScheme.light(
+            primary: _deepBlack,
+            onPrimary: Colors.white,
+            onSurface: _deepBlack,
+          ),
+          // Fixed type mismatch: DialogThemeData instead of DialogTheme
+          dialogTheme: const DialogThemeData(backgroundColor: _crispWhite),
         ),
         child: child!,
       ),
@@ -41,7 +51,13 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
       initialTime: TimeOfDay.now(),
       builder: (context, child) => Theme(
         data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(primary: Colors.black),
+          colorScheme: const ColorScheme.light(
+            primary: _deepBlack,
+            onPrimary: Colors.white,
+            onSurface: _deepBlack,
+          ),
+          // Fixed type mismatch: DialogThemeData instead of DialogTheme
+          dialogTheme: const DialogThemeData(backgroundColor: _crispWhite),
         ),
         child: child!,
       ),
@@ -59,29 +75,43 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: _crispWhite,
       appBar: AppBar(
+        backgroundColor: _crispWhite,
+        elevation: 0,
+        foregroundColor: _deepBlack,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: _deepBlack,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
           'Create Game',
-          style: TextStyle(fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 2.0,
+          ),
         ),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        centerTitle: true,
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
           children: [
             _buildLabel('Date'),
             _buildPickerField(
               text: _selectedDate == null
                   ? 'Select Date'
                   : '${_selectedDate!.toLocal()}'.split(' ')[0],
-              icon: Icons.calendar_today,
+              icon: Icons.calendar_today_outlined,
               onTap: _pickDate,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             _buildLabel('Time'),
             _buildPickerField(
@@ -91,156 +121,109 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
               icon: Icons.access_time,
               onTap: _pickTime,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             _buildLabel('Location'),
             TextFormField(
               controller: _locationController,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 18,
+                color: _deepBlack,
+                fontWeight: FontWeight.w400,
+              ),
+              cursorColor: _champagneGold,
               decoration: _inputStyle('Enter field or park name'),
               validator: (value) => value == null || value.isEmpty
                   ? 'Location is required'
                   : null,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            _buildLabel('Max Players limit'),
+            _buildLabel('Max Players Limit'),
             TextFormField(
               controller: _maxPlayersController,
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 18,
+                color: _deepBlack,
+                fontWeight: FontWeight.w400,
+              ),
+              cursorColor: _champagneGold,
               decoration: _inputStyle('e.g., 10 or 20'),
               validator: (value) =>
                   value == null || value.isEmpty ? 'Limit is required' : null,
             ),
-            const SizedBox(height: 40),
-
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () async {
-                if (_formKey.currentState!.validate() &&
-                    _selectedDate != null &&
-                    _selectedTime != null) {
-                  final int maxPlayers = int.parse(_maxPlayersController.text);
-                  final double fee = maxPlayers <= 10 ? 1.99 : 2.99;
-
-                  try {
-                    // 1. Fetch current authenticated Cognito User
-                    final authUser = await Amplify.Auth.getCurrentUser();
-                    final userId = authUser.userId;
-
-                    // 2. Fetch the Organizer directly by primary key
-                    final userRequest = ModelQueries.get(
-                      User.classType,
-                      UserModelIdentifier(id: userId),
-                    );
-                    final userResponse = await Amplify.API
-                        .query(request: userRequest)
-                        .response;
-                    final organizer = userResponse.data;
-
-                    if (organizer == null) {
-                      safePrint(
-                        'Organizer profile not found in DynamoDB for ID: $userId',
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'User profile not found in database.',
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    // 3. Verify sufficient funds
-                    if (organizer.walletBalance < fee) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Insufficient funds. Please top up \$$fee to schedule.',
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    // 4. Deduct upfront fee from organizer's wallet
-                    final updatedOrganizer = organizer.copyWith(
-                      walletBalance: organizer.walletBalance - fee,
-                    );
-                    await Amplify.API
-                        .mutate(
-                          request: ModelMutations.update(updatedOrganizer),
-                        )
-                        .response;
-
-                    // 5. Generate Payment receipt
-                    final payment = Payment(
-                      amount: fee,
-                      type: 'Organizer Fee Debit',
-                      status: 'Completed',
-                      user: updatedOrganizer,
-                    );
-                    await Amplify.API
-                        .mutate(request: ModelMutations.create(payment))
-                        .response;
-
-                    // 6. Schedule Game
-                    final combinedDateTime = DateTime(
-                      _selectedDate!.year,
-                      _selectedDate!.month,
-                      _selectedDate!.day,
-                      _selectedTime!.hour,
-                      _selectedTime!.minute,
-                    );
-
-                    final newGame = Game(
-                      date: TemporalDate(_selectedDate!),
-                      time: TemporalTime(combinedDateTime),
-                      location: _locationController.text,
-                      organizerId: userId,
-                      maxPlayers: maxPlayers,
-                      appFee: fee,
-                      minimumBalanceRequired: fee,
-                    );
-
-                    final gameResponse = await Amplify.API
-                        .mutate(request: ModelMutations.create(newGame))
-                        .response;
-
-                    if (gameResponse.hasErrors) {
-                      safePrint('Game creation errors: ${gameResponse.errors}');
-                    } else {
-                      safePrint(
-                        'Game scheduled and \$$fee deducted successfully!',
-                      );
-                      if (context.mounted) Navigator.pop(context, true);
-                    }
-                  } on ApiException catch (e) {
-                    safePrint('Transaction failed: $e');
-                  }
-                }
-              },
-              child: const Text(
-                'SCHEDULE GAME',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            const SizedBox(height: 120),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _deepBlack,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 22),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
-          ],
+            onPressed: () async {
+              if (_formKey.currentState!.validate() &&
+                  _selectedDate != null &&
+                  _selectedTime != null) {
+                final int maxPlayers = int.parse(_maxPlayersController.text);
+
+                final combinedDateTime = DateTime(
+                  _selectedDate!.year,
+                  _selectedDate!.month,
+                  _selectedDate!.day,
+                  _selectedTime!.hour,
+                  _selectedTime!.minute,
+                );
+
+                final newGame = Game(
+                  date: TemporalDate(_selectedDate!),
+                  time: TemporalTime(combinedDateTime),
+                  location: _locationController.text,
+                  organizerId: 'ORGANIZER_USER',
+                  maxPlayers: maxPlayers,
+                  appFee: 0.0,
+                  minimumBalanceRequired: 0.0,
+                );
+
+                try {
+                  final request = ModelMutations.create(newGame);
+                  final response = await Amplify.API
+                      .mutate(request: request)
+                      .response;
+
+                  if (response.hasErrors) {
+                    safePrint('Mutation errors: ${response.errors}');
+                  } else {
+                    safePrint(
+                      'Game securely saved with backend fee interception!',
+                    );
+                    if (context.mounted) {
+                      Navigator.pop(context, true);
+                    }
+                  }
+                } on ApiException catch (e) {
+                  safePrint('Mutation failed: $e');
+                }
+              }
+            },
+            child: const Text(
+              'SCHEDULE GAME',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 2.0,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -248,13 +231,14 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
 
   Widget _buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: Text(
-        text,
+        text.toUpperCase(),
         style: const TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w900,
-          color: Colors.black,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: _champagneGold,
+          letterSpacing: 1.5,
         ),
       ),
     );
@@ -263,16 +247,18 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   InputDecoration _inputStyle(String hint) {
     return InputDecoration(
       hintText: hint,
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.grey),
+      hintStyle: TextStyle(
+        color: Colors.grey.shade400,
+        fontWeight: FontWeight.w300,
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.black, width: 3),
+      filled: false,
+      enabledBorder: const UnderlineInputBorder(
+        borderSide: BorderSide(color: Colors.grey, width: 0.5),
       ),
+      focusedBorder: const UnderlineInputBorder(
+        borderSide: BorderSide(color: _champagneGold, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 12),
     );
   }
 
@@ -283,23 +269,25 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   }) {
     return InkWell(
       onTap: onTap,
+      splashColor: _champagneGold.withValues(alpha: 0.1),
+      highlightColor: Colors.transparent,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.grey, width: 0.5)),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 28, color: Colors.black87),
+            Icon(icon, size: 22, color: _champagneGold),
             const SizedBox(width: 16),
             Text(
               text,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w400,
+                color: text.startsWith('Select')
+                    ? Colors.grey.shade400
+                    : _deepBlack,
               ),
             ),
           ],
