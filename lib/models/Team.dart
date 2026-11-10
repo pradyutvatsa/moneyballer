@@ -29,6 +29,7 @@ class Team extends amplify_core.Model {
   static const classType = const _TeamModelType();
   final String id;
   final String? _name;
+  final String? _inviteCode;
   final List<TeamMember>? _members;
   final List<Game>? _games;
   final amplify_core.TemporalDateTime? _createdAt;
@@ -60,6 +61,10 @@ class Team extends amplify_core.Model {
     }
   }
   
+  String? get inviteCode {
+    return _inviteCode;
+  }
+  
   List<TeamMember>? get members {
     return _members;
   }
@@ -76,12 +81,13 @@ class Team extends amplify_core.Model {
     return _updatedAt;
   }
   
-  const Team._internal({required this.id, required name, members, games, createdAt, updatedAt}): _name = name, _members = members, _games = games, _createdAt = createdAt, _updatedAt = updatedAt;
+  const Team._internal({required this.id, required name, inviteCode, members, games, createdAt, updatedAt}): _name = name, _inviteCode = inviteCode, _members = members, _games = games, _createdAt = createdAt, _updatedAt = updatedAt;
   
-  factory Team({String? id, required String name, List<TeamMember>? members, List<Game>? games}) {
+  factory Team({String? id, required String name, String? inviteCode, List<TeamMember>? members, List<Game>? games}) {
     return Team._internal(
       id: id == null ? amplify_core.UUID.getUUID() : id,
       name: name,
+      inviteCode: inviteCode,
       members: members != null ? List<TeamMember>.unmodifiable(members) : members,
       games: games != null ? List<Game>.unmodifiable(games) : games);
   }
@@ -96,6 +102,7 @@ class Team extends amplify_core.Model {
     return other is Team &&
       id == other.id &&
       _name == other._name &&
+      _inviteCode == other._inviteCode &&
       DeepCollectionEquality().equals(_members, other._members) &&
       DeepCollectionEquality().equals(_games, other._games);
   }
@@ -110,6 +117,7 @@ class Team extends amplify_core.Model {
     buffer.write("Team {");
     buffer.write("id=" + "$id" + ", ");
     buffer.write("name=" + "$_name" + ", ");
+    buffer.write("inviteCode=" + "$_inviteCode" + ", ");
     buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
     buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
     buffer.write("}");
@@ -117,22 +125,25 @@ class Team extends amplify_core.Model {
     return buffer.toString();
   }
   
-  Team copyWith({String? name, List<TeamMember>? members, List<Game>? games}) {
+  Team copyWith({String? name, String? inviteCode, List<TeamMember>? members, List<Game>? games}) {
     return Team._internal(
       id: id,
       name: name ?? this.name,
+      inviteCode: inviteCode ?? this.inviteCode,
       members: members ?? this.members,
       games: games ?? this.games);
   }
   
   Team copyWithModelFieldValues({
     ModelFieldValue<String>? name,
+    ModelFieldValue<String?>? inviteCode,
     ModelFieldValue<List<TeamMember>?>? members,
     ModelFieldValue<List<Game>?>? games
   }) {
     return Team._internal(
       id: id,
       name: name == null ? this.name : name.value,
+      inviteCode: inviteCode == null ? this.inviteCode : inviteCode.value,
       members: members == null ? this.members : members.value,
       games: games == null ? this.games : games.value
     );
@@ -141,6 +152,7 @@ class Team extends amplify_core.Model {
   Team.fromJson(Map<String, dynamic> json)  
     : id = json['id'],
       _name = json['name'],
+      _inviteCode = json['inviteCode'],
       _members = json['members']  is Map
         ? (json['members']['items'] is List
           ? (json['members']['items'] as List)
@@ -171,12 +183,13 @@ class Team extends amplify_core.Model {
       _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
   
   Map<String, dynamic> toJson() => {
-    'id': id, 'name': _name, 'members': _members?.map((TeamMember? e) => e?.toJson()).toList(), 'games': _games?.map((Game? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+    'id': id, 'name': _name, 'inviteCode': _inviteCode, 'members': _members?.map((TeamMember? e) => e?.toJson()).toList(), 'games': _games?.map((Game? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
   };
   
   Map<String, Object?> toMap() => {
     'id': id,
     'name': _name,
+    'inviteCode': _inviteCode,
     'members': _members,
     'games': _games,
     'createdAt': _createdAt,
@@ -186,6 +199,7 @@ class Team extends amplify_core.Model {
   static final amplify_core.QueryModelIdentifier<TeamModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<TeamModelIdentifier>();
   static final ID = amplify_core.QueryField(fieldName: "id");
   static final NAME = amplify_core.QueryField(fieldName: "name");
+  static final INVITECODE = amplify_core.QueryField(fieldName: "inviteCode");
   static final MEMBERS = amplify_core.QueryField(
     fieldName: "members",
     fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'TeamMember'));
@@ -213,6 +227,12 @@ class Team extends amplify_core.Model {
     modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
       key: Team.NAME,
       isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Team.INVITECODE,
+      isRequired: false,
       ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
     ));
     

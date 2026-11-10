@@ -14,6 +14,7 @@ const schema = a.schema({
 
   Team: a.model({
     name: a.string().required(),
+    inviteCode: a.string(), // New field for unique squad codes
     members: a.hasMany('TeamMember', 'teamId'),
     games: a.hasMany('Game', 'teamId'),
   }).authorization(allow => [allow.publicApiKey()]),

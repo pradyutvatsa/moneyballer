@@ -3,11 +3,13 @@ import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:amplify_api/amplify_api.dart';
 import 'package:amplify_authenticator/amplify_authenticator.dart';
+import 'package:moneyballer/common/navigation/main_navigation.dart';
 
 import 'amplify_outputs.dart';
 
 import 'package:moneyballer/models/ModelProvider.dart';
-import 'package:moneyballer/features/scheduling/dashboard_screen.dart';
+
+//import 'package:moneyballer/features/scheduling/dashboard_screen.dart';
 
 void main() {
   runApp(const MoneyBallerApp());
@@ -129,7 +131,7 @@ class _MoneyBallerAppState extends State<MoneyBallerApp> {
         builder: Authenticator.builder(),
         title: 'MoneyBaller',
         theme: _buildPremiumTheme(), // Authenticator instantly inherits this aesthetic
-        home: const DashboardScreen(),
+        home: const MainNavigation(),
       ),
     );
   }
