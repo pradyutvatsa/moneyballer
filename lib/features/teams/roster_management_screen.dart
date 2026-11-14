@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:amplify_api/amplify_api.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:moneyballer/models/ModelProvider.dart';
@@ -33,20 +33,33 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
       if (!mounted) return;
       setState(() => _isLoading = true);
 
-      final request = ModelQueries.list(Team.classType);
+      // 1. Get the current authenticated user
+      final authUser = await Amplify.Auth.getCurrentUser();
+
+      // 2. Query TeamMember records where this specific user is a member
+      final request = ModelQueries.list(
+        TeamMember.classType,
+        where: TeamMember.USER.eq(authUser.userId),
+      );
       final response = await Amplify.API.query(request: request).response;
 
       if (response.hasErrors) {
-        safePrint('GraphQL Query errors: ${response.errors}');
+        safePrint('Query errors: ${response.errors}');
       }
 
       final items = response.data?.items;
 
       if (items != null) {
-        final fetchedTeams = items.whereType<Team>().toList();
+        // 3. Map over the join records to extract the actual Team objects
+        final fetchedTeams = items
+            .whereType<TeamMember>()
+            .map((member) => member.team)
+            .whereType<Team>()
+            .toList();
+
         if (mounted) {
           setState(() {
-            _teams = List<Team>.from(fetchedTeams);
+            _teams = fetchedTeams;
             _isLoading = false;
           });
         }
@@ -59,7 +72,7 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
         }
       }
     } on ApiException catch (e) {
-      safePrint('Query failed: $e');
+      safePrint('Fetch teams failed: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -156,18 +169,41 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
     try {
       final uniqueCode = _generateInviteCode();
 
-      // Pass the newly generated invite code to the updated Team model
+      // 1. Create the new Team
       final newTeam = Team(name: name, inviteCode: uniqueCode);
 
-      final request = ModelMutations.create(newTeam);
-      final response = await Amplify.API.mutate(request: request).response;
+      final teamRequest = ModelMutations.create(newTeam);
+      final teamResponse = await Amplify.API
+          .mutate(request: teamRequest)
+          .response;
+      final createdTeam = teamResponse.data;
 
-      if (response.hasErrors) {
-        safePrint('Create Team errors: ${response.errors}');
-      } else {
-        safePrint('Team successfully created with code: $uniqueCode');
-        await _fetchTeams(); // Refresh the list
+      if (teamResponse.hasErrors || createdTeam == null) {
+        safePrint('Create Team errors: ${teamResponse.errors}');
+        setState(() => _isLoading = false);
+        return;
       }
+
+      // 2. Fetch the creator's DynamoDB User profile
+      final authUser = await Amplify.Auth.getCurrentUser();
+      final userRequest = ModelQueries.get(
+        User.classType,
+        UserModelIdentifier(id: authUser.userId),
+      );
+      final userResponse = await Amplify.API
+          .query(request: userRequest)
+          .response;
+      final currentUser = userResponse.data;
+
+      if (currentUser != null) {
+        // 3. Automatically generate a TeamMember record linking the creator to their new squad
+        final newMember = TeamMember(user: currentUser, team: createdTeam);
+        final joinRequest = ModelMutations.create(newMember);
+        await Amplify.API.mutate(request: joinRequest).response;
+      }
+
+      safePrint('Team successfully created and joined with code: $uniqueCode');
+      await _fetchTeams(); // Refresh the filtered list
     } on ApiException catch (e) {
       safePrint('Create Team failed: $e');
       setState(() => _isLoading = false);

@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moneyballer/features/scheduling/dashboard_screen.dart';
 import 'package:moneyballer/features/teams/roster_management_screen.dart';
+import 'package:moneyballer/features/profile/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -18,21 +19,16 @@ class _MainNavigationState extends State<MainNavigation> {
   static const Color _champagneGold = Color(0xFFC2A878);
 
   // The screens that correspond to each tab
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const RosterManagementScreen(), // Replaced 'Teams Screen Coming Soon'
+  final List<Widget> _screens = <Widget>[
+    DashboardScreen() as Widget,
+    RosterManagementScreen() as Widget, // Replaced 'Teams Screen Coming Soon'
     const Center(
       child: Text(
         'Chats Screen Coming Soon',
         style: TextStyle(color: _deepBlack, fontSize: 18),
       ),
     ),
-    const Center(
-      child: Text(
-        'Profile Screen Coming Soon',
-        style: TextStyle(color: _deepBlack, fontSize: 18),
-      ),
-    ),
+    ProfileScreen() as Widget,
   ];
 
   @override
