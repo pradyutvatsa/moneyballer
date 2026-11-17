@@ -5,6 +5,8 @@ const schema = a.schema({
   User: a.model({
     name: a.string().required(),
     email: a.string().required(),
+    phoneNumber: a.string(), // New field for the contact card
+    additionalEmails: a.string().array(),
     role: a.string(),
     walletBalance: a.float().required(),
     teams: a.hasMany('TeamMember', 'userId'),

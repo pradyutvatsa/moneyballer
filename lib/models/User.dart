@@ -30,6 +30,8 @@ class User extends amplify_core.Model {
   final String id;
   final String? _name;
   final String? _email;
+  final String? _phoneNumber;
+  final List<String>? _additionalEmails;
   final String? _role;
   final double? _walletBalance;
   final List<TeamMember>? _teams;
@@ -77,6 +79,14 @@ class User extends amplify_core.Model {
     }
   }
   
+  String? get phoneNumber {
+    return _phoneNumber;
+  }
+  
+  List<String>? get additionalEmails {
+    return _additionalEmails;
+  }
+  
   String? get role {
     return _role;
   }
@@ -114,13 +124,15 @@ class User extends amplify_core.Model {
     return _updatedAt;
   }
   
-  const User._internal({required this.id, required name, required email, role, required walletBalance, teams, payments, rsvps, createdAt, updatedAt}): _name = name, _email = email, _role = role, _walletBalance = walletBalance, _teams = teams, _payments = payments, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
+  const User._internal({required this.id, required name, required email, phoneNumber, additionalEmails, role, required walletBalance, teams, payments, rsvps, createdAt, updatedAt}): _name = name, _email = email, _phoneNumber = phoneNumber, _additionalEmails = additionalEmails, _role = role, _walletBalance = walletBalance, _teams = teams, _payments = payments, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
   
-  factory User({String? id, required String name, required String email, String? role, required double walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
+  factory User({String? id, required String name, required String email, String? phoneNumber, List<String>? additionalEmails, String? role, required double walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
     return User._internal(
       id: id == null ? amplify_core.UUID.getUUID() : id,
       name: name,
       email: email,
+      phoneNumber: phoneNumber,
+      additionalEmails: additionalEmails != null ? List<String>.unmodifiable(additionalEmails) : additionalEmails,
       role: role,
       walletBalance: walletBalance,
       teams: teams != null ? List<TeamMember>.unmodifiable(teams) : teams,
@@ -139,6 +151,8 @@ class User extends amplify_core.Model {
       id == other.id &&
       _name == other._name &&
       _email == other._email &&
+      _phoneNumber == other._phoneNumber &&
+      DeepCollectionEquality().equals(_additionalEmails, other._additionalEmails) &&
       _role == other._role &&
       _walletBalance == other._walletBalance &&
       DeepCollectionEquality().equals(_teams, other._teams) &&
@@ -157,6 +171,8 @@ class User extends amplify_core.Model {
     buffer.write("id=" + "$id" + ", ");
     buffer.write("name=" + "$_name" + ", ");
     buffer.write("email=" + "$_email" + ", ");
+    buffer.write("phoneNumber=" + "$_phoneNumber" + ", ");
+    buffer.write("additionalEmails=" + (_additionalEmails != null ? _additionalEmails!.toString() : "null") + ", ");
     buffer.write("role=" + "$_role" + ", ");
     buffer.write("walletBalance=" + (_walletBalance != null ? _walletBalance!.toString() : "null") + ", ");
     buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
@@ -166,11 +182,13 @@ class User extends amplify_core.Model {
     return buffer.toString();
   }
   
-  User copyWith({String? name, String? email, String? role, double? walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
+  User copyWith({String? name, String? email, String? phoneNumber, List<String>? additionalEmails, String? role, double? walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
     return User._internal(
       id: id,
       name: name ?? this.name,
       email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      additionalEmails: additionalEmails ?? this.additionalEmails,
       role: role ?? this.role,
       walletBalance: walletBalance ?? this.walletBalance,
       teams: teams ?? this.teams,
@@ -181,6 +199,8 @@ class User extends amplify_core.Model {
   User copyWithModelFieldValues({
     ModelFieldValue<String>? name,
     ModelFieldValue<String>? email,
+    ModelFieldValue<String?>? phoneNumber,
+    ModelFieldValue<List<String>?>? additionalEmails,
     ModelFieldValue<String?>? role,
     ModelFieldValue<double>? walletBalance,
     ModelFieldValue<List<TeamMember>?>? teams,
@@ -191,6 +211,8 @@ class User extends amplify_core.Model {
       id: id,
       name: name == null ? this.name : name.value,
       email: email == null ? this.email : email.value,
+      phoneNumber: phoneNumber == null ? this.phoneNumber : phoneNumber.value,
+      additionalEmails: additionalEmails == null ? this.additionalEmails : additionalEmails.value,
       role: role == null ? this.role : role.value,
       walletBalance: walletBalance == null ? this.walletBalance : walletBalance.value,
       teams: teams == null ? this.teams : teams.value,
@@ -203,6 +225,8 @@ class User extends amplify_core.Model {
     : id = json['id'],
       _name = json['name'],
       _email = json['email'],
+      _phoneNumber = json['phoneNumber'],
+      _additionalEmails = json['additionalEmails']?.cast<String>(),
       _role = json['role'],
       _walletBalance = (json['walletBalance'] as num?)?.toDouble(),
       _teams = json['teams']  is Map
@@ -248,13 +272,15 @@ class User extends amplify_core.Model {
       _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
   
   Map<String, dynamic> toJson() => {
-    'id': id, 'name': _name, 'email': _email, 'role': _role, 'walletBalance': _walletBalance, 'teams': _teams?.map((TeamMember? e) => e?.toJson()).toList(), 'payments': _payments?.map((Payment? e) => e?.toJson()).toList(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+    'id': id, 'name': _name, 'email': _email, 'phoneNumber': _phoneNumber, 'additionalEmails': _additionalEmails, 'role': _role, 'walletBalance': _walletBalance, 'teams': _teams?.map((TeamMember? e) => e?.toJson()).toList(), 'payments': _payments?.map((Payment? e) => e?.toJson()).toList(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
   };
   
   Map<String, Object?> toMap() => {
     'id': id,
     'name': _name,
     'email': _email,
+    'phoneNumber': _phoneNumber,
+    'additionalEmails': _additionalEmails,
     'role': _role,
     'walletBalance': _walletBalance,
     'teams': _teams,
@@ -268,6 +294,8 @@ class User extends amplify_core.Model {
   static final ID = amplify_core.QueryField(fieldName: "id");
   static final NAME = amplify_core.QueryField(fieldName: "name");
   static final EMAIL = amplify_core.QueryField(fieldName: "email");
+  static final PHONENUMBER = amplify_core.QueryField(fieldName: "phoneNumber");
+  static final ADDITIONALEMAILS = amplify_core.QueryField(fieldName: "additionalEmails");
   static final ROLE = amplify_core.QueryField(fieldName: "role");
   static final WALLETBALANCE = amplify_core.QueryField(fieldName: "walletBalance");
   static final TEAMS = amplify_core.QueryField(
@@ -307,6 +335,19 @@ class User extends amplify_core.Model {
       key: User.EMAIL,
       isRequired: true,
       ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.PHONENUMBER,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.ADDITIONALEMAILS,
+      isRequired: false,
+      isArray: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.collection, ofModelName: amplify_core.ModelFieldTypeEnum.string.name)
     ));
     
     modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
