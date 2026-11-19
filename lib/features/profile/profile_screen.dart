@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:moneyballer/models/ModelProvider.dart';
 import 'package:moneyballer/features/scheduling/financial_dashboard_screen.dart';
 import 'package:moneyballer/features/profile/contact_information_screen.dart';
+import 'package:moneyballer/features/profile/profile_and_account_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -307,12 +308,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildActionCard(
                   title: 'Profile and Account',
                   icon: Icons.person_outline,
-                  onTap: () {},
-                ),
-                _buildActionCard(
-                  title: 'Security',
-                  icon: Icons.security_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileAndAccountScreen(),
+                      ),
+                    );
+                  },
                 ),
                 _buildActionCard(
                   title: 'Group Memberships',

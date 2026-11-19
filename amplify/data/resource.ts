@@ -5,10 +5,21 @@ const schema = a.schema({
   User: a.model({
     name: a.string().required(),
     email: a.string().required(),
-    phoneNumber: a.string(), // New field for the contact card
+    phoneNumber: a.string(),
     additionalEmails: a.string().array(),
+
+    // New Profile & Account Fields
+    firstName: a.string(),
+    middleName: a.string(),
+    lastName: a.string(),
+    birthDate: a.date(), // Gen 2 supports strict date types
+    gender: a.string(),
+    country: a.string(),
+    timeZone: a.string(),
+
     role: a.string(),
     walletBalance: a.float().required(),
+
     teams: a.hasMany('TeamMember', 'userId'),
     payments: a.hasMany('Payment', 'userId'),
     rsvps: a.hasMany('RSVP', 'userId'),

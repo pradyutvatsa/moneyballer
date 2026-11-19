@@ -5,6 +5,7 @@ import 'package:amplify_api/amplify_api.dart';
 import 'package:amplify_authenticator/amplify_authenticator.dart';
 import 'package:moneyballer/common/navigation/main_navigation.dart';
 import 'package:amplify_storage_s3/amplify_storage_s3.dart';
+import 'package:flutter/gestures.dart';
 
 import 'amplify_outputs.dart';
 
@@ -134,6 +135,10 @@ class _MoneyBallerAppState extends State<MoneyBallerApp> {
         builder: Authenticator.builder(),
         title: 'MoneyBaller',
         theme: _buildPremiumTheme(), // Authenticator instantly inherits this aesthetic
+        // Add this property to enable mouse/trackpad scrolling app-wide
+        scrollBehavior: const MaterialScrollBehavior().copyWith(
+          dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse},
+        ),
         home: const MainNavigation(),
       ),
     );

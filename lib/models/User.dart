@@ -32,6 +32,13 @@ class User extends amplify_core.Model {
   final String? _email;
   final String? _phoneNumber;
   final List<String>? _additionalEmails;
+  final String? _firstName;
+  final String? _middleName;
+  final String? _lastName;
+  final amplify_core.TemporalDate? _birthDate;
+  final String? _gender;
+  final String? _country;
+  final String? _timeZone;
   final String? _role;
   final double? _walletBalance;
   final List<TeamMember>? _teams;
@@ -87,6 +94,34 @@ class User extends amplify_core.Model {
     return _additionalEmails;
   }
   
+  String? get firstName {
+    return _firstName;
+  }
+  
+  String? get middleName {
+    return _middleName;
+  }
+  
+  String? get lastName {
+    return _lastName;
+  }
+  
+  amplify_core.TemporalDate? get birthDate {
+    return _birthDate;
+  }
+  
+  String? get gender {
+    return _gender;
+  }
+  
+  String? get country {
+    return _country;
+  }
+  
+  String? get timeZone {
+    return _timeZone;
+  }
+  
   String? get role {
     return _role;
   }
@@ -124,15 +159,22 @@ class User extends amplify_core.Model {
     return _updatedAt;
   }
   
-  const User._internal({required this.id, required name, required email, phoneNumber, additionalEmails, role, required walletBalance, teams, payments, rsvps, createdAt, updatedAt}): _name = name, _email = email, _phoneNumber = phoneNumber, _additionalEmails = additionalEmails, _role = role, _walletBalance = walletBalance, _teams = teams, _payments = payments, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
+  const User._internal({required this.id, required name, required email, phoneNumber, additionalEmails, firstName, middleName, lastName, birthDate, gender, country, timeZone, role, required walletBalance, teams, payments, rsvps, createdAt, updatedAt}): _name = name, _email = email, _phoneNumber = phoneNumber, _additionalEmails = additionalEmails, _firstName = firstName, _middleName = middleName, _lastName = lastName, _birthDate = birthDate, _gender = gender, _country = country, _timeZone = timeZone, _role = role, _walletBalance = walletBalance, _teams = teams, _payments = payments, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
   
-  factory User({String? id, required String name, required String email, String? phoneNumber, List<String>? additionalEmails, String? role, required double walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
+  factory User({String? id, required String name, required String email, String? phoneNumber, List<String>? additionalEmails, String? firstName, String? middleName, String? lastName, amplify_core.TemporalDate? birthDate, String? gender, String? country, String? timeZone, String? role, required double walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
     return User._internal(
       id: id == null ? amplify_core.UUID.getUUID() : id,
       name: name,
       email: email,
       phoneNumber: phoneNumber,
       additionalEmails: additionalEmails != null ? List<String>.unmodifiable(additionalEmails) : additionalEmails,
+      firstName: firstName,
+      middleName: middleName,
+      lastName: lastName,
+      birthDate: birthDate,
+      gender: gender,
+      country: country,
+      timeZone: timeZone,
       role: role,
       walletBalance: walletBalance,
       teams: teams != null ? List<TeamMember>.unmodifiable(teams) : teams,
@@ -153,6 +195,13 @@ class User extends amplify_core.Model {
       _email == other._email &&
       _phoneNumber == other._phoneNumber &&
       DeepCollectionEquality().equals(_additionalEmails, other._additionalEmails) &&
+      _firstName == other._firstName &&
+      _middleName == other._middleName &&
+      _lastName == other._lastName &&
+      _birthDate == other._birthDate &&
+      _gender == other._gender &&
+      _country == other._country &&
+      _timeZone == other._timeZone &&
       _role == other._role &&
       _walletBalance == other._walletBalance &&
       DeepCollectionEquality().equals(_teams, other._teams) &&
@@ -173,6 +222,13 @@ class User extends amplify_core.Model {
     buffer.write("email=" + "$_email" + ", ");
     buffer.write("phoneNumber=" + "$_phoneNumber" + ", ");
     buffer.write("additionalEmails=" + (_additionalEmails != null ? _additionalEmails!.toString() : "null") + ", ");
+    buffer.write("firstName=" + "$_firstName" + ", ");
+    buffer.write("middleName=" + "$_middleName" + ", ");
+    buffer.write("lastName=" + "$_lastName" + ", ");
+    buffer.write("birthDate=" + (_birthDate != null ? _birthDate!.format() : "null") + ", ");
+    buffer.write("gender=" + "$_gender" + ", ");
+    buffer.write("country=" + "$_country" + ", ");
+    buffer.write("timeZone=" + "$_timeZone" + ", ");
     buffer.write("role=" + "$_role" + ", ");
     buffer.write("walletBalance=" + (_walletBalance != null ? _walletBalance!.toString() : "null") + ", ");
     buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
@@ -182,13 +238,20 @@ class User extends amplify_core.Model {
     return buffer.toString();
   }
   
-  User copyWith({String? name, String? email, String? phoneNumber, List<String>? additionalEmails, String? role, double? walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
+  User copyWith({String? name, String? email, String? phoneNumber, List<String>? additionalEmails, String? firstName, String? middleName, String? lastName, amplify_core.TemporalDate? birthDate, String? gender, String? country, String? timeZone, String? role, double? walletBalance, List<TeamMember>? teams, List<Payment>? payments, List<RSVP>? rsvps}) {
     return User._internal(
       id: id,
       name: name ?? this.name,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       additionalEmails: additionalEmails ?? this.additionalEmails,
+      firstName: firstName ?? this.firstName,
+      middleName: middleName ?? this.middleName,
+      lastName: lastName ?? this.lastName,
+      birthDate: birthDate ?? this.birthDate,
+      gender: gender ?? this.gender,
+      country: country ?? this.country,
+      timeZone: timeZone ?? this.timeZone,
       role: role ?? this.role,
       walletBalance: walletBalance ?? this.walletBalance,
       teams: teams ?? this.teams,
@@ -201,6 +264,13 @@ class User extends amplify_core.Model {
     ModelFieldValue<String>? email,
     ModelFieldValue<String?>? phoneNumber,
     ModelFieldValue<List<String>?>? additionalEmails,
+    ModelFieldValue<String?>? firstName,
+    ModelFieldValue<String?>? middleName,
+    ModelFieldValue<String?>? lastName,
+    ModelFieldValue<amplify_core.TemporalDate?>? birthDate,
+    ModelFieldValue<String?>? gender,
+    ModelFieldValue<String?>? country,
+    ModelFieldValue<String?>? timeZone,
     ModelFieldValue<String?>? role,
     ModelFieldValue<double>? walletBalance,
     ModelFieldValue<List<TeamMember>?>? teams,
@@ -213,6 +283,13 @@ class User extends amplify_core.Model {
       email: email == null ? this.email : email.value,
       phoneNumber: phoneNumber == null ? this.phoneNumber : phoneNumber.value,
       additionalEmails: additionalEmails == null ? this.additionalEmails : additionalEmails.value,
+      firstName: firstName == null ? this.firstName : firstName.value,
+      middleName: middleName == null ? this.middleName : middleName.value,
+      lastName: lastName == null ? this.lastName : lastName.value,
+      birthDate: birthDate == null ? this.birthDate : birthDate.value,
+      gender: gender == null ? this.gender : gender.value,
+      country: country == null ? this.country : country.value,
+      timeZone: timeZone == null ? this.timeZone : timeZone.value,
       role: role == null ? this.role : role.value,
       walletBalance: walletBalance == null ? this.walletBalance : walletBalance.value,
       teams: teams == null ? this.teams : teams.value,
@@ -227,6 +304,13 @@ class User extends amplify_core.Model {
       _email = json['email'],
       _phoneNumber = json['phoneNumber'],
       _additionalEmails = json['additionalEmails']?.cast<String>(),
+      _firstName = json['firstName'],
+      _middleName = json['middleName'],
+      _lastName = json['lastName'],
+      _birthDate = json['birthDate'] != null ? amplify_core.TemporalDate.fromString(json['birthDate']) : null,
+      _gender = json['gender'],
+      _country = json['country'],
+      _timeZone = json['timeZone'],
       _role = json['role'],
       _walletBalance = (json['walletBalance'] as num?)?.toDouble(),
       _teams = json['teams']  is Map
@@ -272,7 +356,7 @@ class User extends amplify_core.Model {
       _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
   
   Map<String, dynamic> toJson() => {
-    'id': id, 'name': _name, 'email': _email, 'phoneNumber': _phoneNumber, 'additionalEmails': _additionalEmails, 'role': _role, 'walletBalance': _walletBalance, 'teams': _teams?.map((TeamMember? e) => e?.toJson()).toList(), 'payments': _payments?.map((Payment? e) => e?.toJson()).toList(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+    'id': id, 'name': _name, 'email': _email, 'phoneNumber': _phoneNumber, 'additionalEmails': _additionalEmails, 'firstName': _firstName, 'middleName': _middleName, 'lastName': _lastName, 'birthDate': _birthDate?.format(), 'gender': _gender, 'country': _country, 'timeZone': _timeZone, 'role': _role, 'walletBalance': _walletBalance, 'teams': _teams?.map((TeamMember? e) => e?.toJson()).toList(), 'payments': _payments?.map((Payment? e) => e?.toJson()).toList(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
   };
   
   Map<String, Object?> toMap() => {
@@ -281,6 +365,13 @@ class User extends amplify_core.Model {
     'email': _email,
     'phoneNumber': _phoneNumber,
     'additionalEmails': _additionalEmails,
+    'firstName': _firstName,
+    'middleName': _middleName,
+    'lastName': _lastName,
+    'birthDate': _birthDate,
+    'gender': _gender,
+    'country': _country,
+    'timeZone': _timeZone,
     'role': _role,
     'walletBalance': _walletBalance,
     'teams': _teams,
@@ -296,6 +387,13 @@ class User extends amplify_core.Model {
   static final EMAIL = amplify_core.QueryField(fieldName: "email");
   static final PHONENUMBER = amplify_core.QueryField(fieldName: "phoneNumber");
   static final ADDITIONALEMAILS = amplify_core.QueryField(fieldName: "additionalEmails");
+  static final FIRSTNAME = amplify_core.QueryField(fieldName: "firstName");
+  static final MIDDLENAME = amplify_core.QueryField(fieldName: "middleName");
+  static final LASTNAME = amplify_core.QueryField(fieldName: "lastName");
+  static final BIRTHDATE = amplify_core.QueryField(fieldName: "birthDate");
+  static final GENDER = amplify_core.QueryField(fieldName: "gender");
+  static final COUNTRY = amplify_core.QueryField(fieldName: "country");
+  static final TIMEZONE = amplify_core.QueryField(fieldName: "timeZone");
   static final ROLE = amplify_core.QueryField(fieldName: "role");
   static final WALLETBALANCE = amplify_core.QueryField(fieldName: "walletBalance");
   static final TEAMS = amplify_core.QueryField(
@@ -348,6 +446,48 @@ class User extends amplify_core.Model {
       isRequired: false,
       isArray: true,
       ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.collection, ofModelName: amplify_core.ModelFieldTypeEnum.string.name)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.FIRSTNAME,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.MIDDLENAME,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.LASTNAME,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.BIRTHDATE,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.date)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.GENDER,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.COUNTRY,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: User.TIMEZONE,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
     ));
     
     modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
