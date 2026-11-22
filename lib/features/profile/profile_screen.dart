@@ -308,13 +308,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildActionCard(
                   title: 'Profile and Account',
                   icon: Icons.person_outline,
-                  onTap: () {
-                    Navigator.push(
+                  onTap: () async {
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const ProfileAndAccountScreen(),
                       ),
                     );
+                    _fetchUserProfile();
                   },
                 ),
                 _buildActionCard(

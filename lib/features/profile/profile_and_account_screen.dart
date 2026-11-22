@@ -4,7 +4,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:amplify_api/amplify_api.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:country_picker/country_picker.dart';
+import 'package:moneyballer/common/utils/country_timezones.dart';
 import 'package:moneyballer/models/ModelProvider.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileAndAccountScreen extends StatefulWidget {
   const ProfileAndAccountScreen({super.key});
@@ -31,8 +34,8 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
   String _lastName = '';
   DateTime _birthDate = DateTime(1990, 1, 1);
   String _gender = 'Male';
-  final String _country = 'Australia';
-  final String _timeZone = 'AEST (Sydney)';
+  String _country = 'Australia';
+  String _timeZone = 'Australia/Sydney (UTC+11:00)';
 
   @override
   void initState() {
@@ -69,7 +72,6 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
           _cloudProfileImageUrl = fetchedImageUrl;
 
           if (_userProfile != null) {
-            // Fallback to splitting the legacy 'name' field if firstName isn't populated yet
             if (_userProfile!.firstName != null &&
                 _userProfile!.firstName!.isNotEmpty) {
               _firstName = _userProfile!.firstName!;
@@ -89,6 +91,16 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
                 _userProfile!.gender!.isNotEmpty) {
               _gender = _userProfile!.gender!;
             }
+
+            if (_userProfile!.country != null &&
+                _userProfile!.country!.isNotEmpty) {
+              _country = _userProfile!.country!;
+            }
+
+            if (_userProfile!.timeZone != null &&
+                _userProfile!.timeZone!.isNotEmpty) {
+              _timeZone = _userProfile!.timeZone!;
+            }
           }
           _isLoading = false;
         });
@@ -99,6 +111,121 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
     }
   }
 
+  // Show Take Photo / Choose Photo Bottom Sheet
+  void _showPhotoOptionsModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _crispWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+      ),
+      builder: (modalContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: _deepBlack,
+                  ),
+                  title: const Text(
+                    'TAKE PHOTO',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _deepBlack,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(modalContext);
+                    _pickAndUploadImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library_outlined,
+                    color: _deepBlack,
+                  ),
+                  title: const Text(
+                    'CHOOSE PHOTO',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _deepBlack,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(modalContext);
+                    _pickAndUploadImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Pick image from Camera/Gallery and upload to S3
+  Future<void> _pickAndUploadImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 1000,
+      imageQuality: 85,
+    );
+
+    if (pickedFile == null || !mounted) return;
+
+    setState(() {
+      _localProfileImage = File(pickedFile.path);
+    });
+
+    try {
+      final authUser = await Amplify.Auth.getCurrentUser();
+      final awsFile = AWSFile.fromPath(pickedFile.path);
+      final uploadPath = StoragePath.fromString(
+        'profile-pictures/${authUser.userId}/profile.jpg',
+      );
+
+      final uploadResult = await Amplify.Storage.uploadFile(
+        localFile: awsFile,
+        path: uploadPath,
+      ).result;
+
+      safePrint(
+        'Successfully uploaded photo to S3: ${uploadResult.uploadedItem.path}',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture updated.'),
+            backgroundColor: _deepBlack,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      safePrint('Error uploading photo to S3: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to upload profile picture.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   // 2. Execute ModelMutations.update() to sync changes to DynamoDB
   Future<void> _updateUserProfile({
     String? newFirst,
@@ -106,6 +233,8 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
     String? newLast,
     DateTime? newBirthDate,
     String? newGender,
+    String? newCountry,
+    String? newTimeZone,
   }) async {
     if (_userProfile == null) return;
 
@@ -114,8 +243,9 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
     final updatedLast = newLast ?? _lastName;
     final updatedBirthDate = newBirthDate ?? _birthDate;
     final updatedGender = newGender ?? _gender;
+    final updatedCountry = newCountry ?? _country;
+    final updatedTimeZone = newTimeZone ?? _timeZone;
 
-    // Keep the legacy full 'name' field synced for other screens
     final combinedFullName = updatedMiddle.isEmpty
         ? '$updatedFirst $updatedLast'.trim()
         : '$updatedFirst $updatedMiddle $updatedLast'.trim();
@@ -130,6 +260,8 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
         lastName: updatedLast,
         birthDate: TemporalDate(updatedBirthDate),
         gender: updatedGender,
+        country: updatedCountry,
+        timeZone: updatedTimeZone,
       );
 
       final request = ModelMutations.update(updatedUser);
@@ -154,6 +286,8 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
             _lastName = updatedLast;
             _birthDate = updatedBirthDate;
             _gender = updatedGender;
+            _country = updatedCountry;
+            _timeZone = updatedTimeZone;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -167,6 +301,206 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
     } on ApiException catch (e) {
       safePrint('Mutation failed: $e');
     }
+  }
+
+  // 3. Country Picker Modal + Confirmation Dialog
+  void _showCountryPickerModal() {
+    showCountryPicker(
+      context: context,
+      showPhoneCode: false,
+      countryListTheme: CountryListThemeData(
+        backgroundColor: _crispWhite,
+        bottomSheetHeight: MediaQuery.of(context).size.height * 0.75,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+        textStyle: const TextStyle(
+          fontSize: 16,
+          color: _deepBlack,
+          fontWeight: FontWeight.w400,
+        ),
+        searchTextStyle: const TextStyle(fontSize: 16, color: _deepBlack),
+      ),
+      onSelect: (Country country) {
+        if (country.name != _country) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showCountryConfirmationDialog(country.name);
+            }
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _showCountryConfirmationDialog(String selectedCountry) async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _crispWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        title: const Text(
+          'CONFIRM COUNTRY',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _champagneGold,
+            letterSpacing: 1.5,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to update your country or region to $selectedCountry?',
+          style: const TextStyle(
+            fontSize: 16,
+            color: _deepBlack,
+            fontWeight: FontWeight.w300,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(
+              'CANCEL',
+              style: TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _deepBlack,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              // Only updates country; last selected _timeZone stays intact unless user opens Time Zone card
+              await _updateUserProfile(newCountry: selectedCountry);
+            },
+            child: const Text(
+              'CONFIRM',
+              style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 1.2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 4. Time Zone Picker Modal filtered by currently selected Country
+  void _showTimeZonePickerModal() {
+    final List<String> countryTimeZones =
+        CountryTimezoneHelper.getTimezonesForCountryName(_country);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _crispWhite,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+      ),
+      builder: (modalContext) {
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.55,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 14.0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'TIME ZONES IN ${_country.toUpperCase()}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _champagneGold,
+                            letterSpacing: 1.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(modalContext),
+                        child: const Text(
+                          'CANCEL',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFFEEEEEE),
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    itemCount: countryTimeZones.length,
+                    separatorBuilder: (_, _) => const Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: Color(0xFFEEEEEE),
+                      indent: 24,
+                      endIndent: 24,
+                    ),
+                    itemBuilder: (context, index) {
+                      final zone = countryTimeZones[index];
+                      final isSelected = zone == _timeZone;
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 24.0,
+                          vertical: 4.0,
+                        ),
+                        title: Text(
+                          zone,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w300,
+                            color: _deepBlack,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(
+                                Icons.check,
+                                color: _champagneGold,
+                                size: 20,
+                              )
+                            : null,
+                        onTap: () async {
+                          Navigator.pop(modalContext);
+                          if (zone != _timeZone) {
+                            await _updateUserProfile(newTimeZone: zone);
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   String _formatDate(DateTime date) {
@@ -199,7 +533,6 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
     return '$_firstName $_middleName $_lastName'.toUpperCase();
   }
 
-  // Birth Date Rolodex Modal wired to SAVE
   void _showBirthDateModal() {
     DateTime tempDate = _birthDate;
     showModalBottomSheet(
@@ -273,7 +606,6 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
     );
   }
 
-  // Gender Picker Modal wired to SAVE
   void _showGenderModal() {
     String tempGender = _gender;
     final List<String> genderOptions = ['Male', 'Female'];
@@ -363,6 +695,167 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
           ),
         );
       },
+    );
+  }
+
+  // 5. Delete Account Confirmation Dialog ("CONFIRM DELETE")
+  Future<void> _showDeleteAccountDialog() async {
+    final TextEditingController confirmController = TextEditingController();
+    bool isProcessing = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (stateContext, setDialogState) {
+          final bool isMatch =
+              confirmController.text.trim().toUpperCase() == 'CONFIRM DELETE';
+
+          return AlertDialog(
+            backgroundColor: _crispWhite,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            title: const Text(
+              'DELETE ACCOUNT',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.red,
+                letterSpacing: 1.5,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Your account will be disabled immediately and permanently purged from our database in 7 days.\n\nType CONFIRM DELETE below to proceed:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w300,
+                    color: _deepBlack,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmController,
+                  cursorColor: Colors.red,
+                  textCapitalization: TextCapitalization.characters,
+                  onChanged: (_) => setDialogState(() {}),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: _deepBlack,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1.5,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'CONFIRM DELETE',
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: 1.5,
+                    ),
+                    enabledBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey, width: 0.5),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red, width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isProcessing
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: const Text(
+                  'CANCEL',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                onPressed: (!isMatch || isProcessing)
+                    ? null
+                    : () async {
+                        final navigator = Navigator.of(dialogContext);
+                        final rootNavigator = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
+
+                        setDialogState(() => isProcessing = true);
+
+                        try {
+                          if (_userProfile != null) {
+                            final purgeDate = DateTime.now().toUtc().add(
+                              const Duration(days: 7),
+                            );
+                            final disabledUser = _userProfile!.copyWith(
+                              accountStatus: 'PENDING_DELETION',
+                              scheduledDeletionAt: TemporalDateTime(purgeDate),
+                            );
+
+                            final response = await Amplify.API
+                                .mutate(
+                                  request: ModelMutations.update(disabledUser),
+                                )
+                                .response;
+
+                            if (response.hasErrors) {
+                              throw Exception(response.errors.first.message);
+                            }
+                          }
+
+                          navigator.pop();
+                          rootNavigator.popUntil((route) => route.isFirst);
+                          await Amplify.Auth.signOut();
+                        } on Exception catch (e) {
+                          safePrint('Account deletion scheduling failed: $e');
+                          setDialogState(() => isProcessing = false);
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to schedule deletion: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                child: isProcessing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'DELETE',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -523,9 +1016,7 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
                       ),
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
-                        onPressed: () {
-                          safePrint('Change profile picture tapped');
-                        },
+                        onPressed: _showPhotoOptionsModal,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _deepBlack,
                           side: const BorderSide(color: _deepBlack, width: 1),
@@ -552,7 +1043,7 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Full Name Card wired to NameEditScreen & SAVE
+                // Full Name Card
                 _buildFieldCard(
                   title: 'FULL NAME',
                   value: _buildFullName(),
@@ -592,13 +1083,14 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
                 _buildFieldCard(
                   title: 'COUNTRY OR REGION',
                   value: _country,
-                  onTap: () {},
+                  onTap: _showCountryPickerModal,
                 ),
 
+                // Time Zone Card wired to Country-Filtered Picker
                 _buildFieldCard(
                   title: 'TIME ZONE',
                   value: _timeZone,
-                  onTap: () {},
+                  onTap: _showTimeZonePickerModal,
                 ),
 
                 const SizedBox(height: 16),
@@ -607,7 +1099,7 @@ class _ProfileAndAccountScreenState extends State<ProfileAndAccountScreen> {
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 32.0),
                   child: TextButton(
-                    onPressed: () {},
+                    onPressed: _showDeleteAccountDialog,
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 24.0),
                       backgroundColor: Colors.white,

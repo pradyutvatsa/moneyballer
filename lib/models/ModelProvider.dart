@@ -38,7 +38,7 @@ export 'Venue.dart';
 
 class ModelProvider implements amplify_core.ModelProviderInterface {
   @override
-  String version = "f8df9e06f64185ba884476054f196c6f";
+  String version = "74aed1383e6f62f8e2339c43998db413";
   @override
   List<amplify_core.ModelSchema> modelSchemas = [Game.schema, Payment.schema, RSVP.schema, Team.schema, TeamMember.schema, User.schema, Venue.schema];
   @override

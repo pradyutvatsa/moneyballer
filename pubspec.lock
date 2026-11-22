@@ -233,6 +233,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.2"
+  country_picker:
+    dependency: "direct main"
+    description:
+      name: country_picker
+      sha256: "8ef721183bd7e0a6017c413693cdc68051daceef5790f5420c3b4378b5c69115"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.28"
   crclib:
     dependency: transitive
     description:
@@ -962,6 +970,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.14"
+  timezone:
+    dependency: "direct main"
+    description:
+      name: timezone
+      sha256: "9f4e5a1a0e4fef7dd3424842c0575db01bfb7a11730e8d55753fcd5c5c98767b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.11.2"
   tuple:
     dependency: transitive
     description:
@@ -978,6 +994,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  universal_io:
+    dependency: transitive
+    description:
+      name: universal_io
+      sha256: f63cbc48103236abf48e345e07a03ce5757ea86285ed313a6a032596ed9301e2
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.1"
   url_launcher:
     dependency: transitive
     description:

@@ -7,6 +7,9 @@ const schema = a.schema({
     email: a.string().required(),
     phoneNumber: a.string(),
     additionalEmails: a.string().array(),
+    // Account Lifecycle / Deletion Fields
+    accountStatus: a.string(), // e.g., 'ACTIVE', 'PENDING_DELETION'
+    scheduledDeletionAt: a.datetime(),
 
     // New Profile & Account Fields
     firstName: a.string(),
