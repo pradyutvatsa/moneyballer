@@ -22,7 +22,7 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
                 name: name || 'New Player',
                 email: email,
                 walletBalance: 0.0,
-            });
+            } as any);
 
             if (errors) {
                 console.error('Errors creating User in AppSync:', errors);

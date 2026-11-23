@@ -84,9 +84,14 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: _crispWhite,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-        ), // Clean geometric edges[cite: 15]
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+        titlePadding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12.0),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 24.0,
+          vertical: 8.0,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 20.0),
         title: const Text(
           'NEW TEAM',
           style: TextStyle(
@@ -120,6 +125,12 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
         ),
         actions: [
           TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 12.0,
+              ),
+            ),
             onPressed: () => Navigator.pop(context),
             child: const Text(
               'CANCEL',
@@ -130,24 +141,29 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 8),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: _deepBlack,
               foregroundColor: Colors.white,
               elevation: 0,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 14.0,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
             onPressed: () async {
               if (teamNameController.text.trim().isNotEmpty) {
-                Navigator.pop(context); // Close dialog immediately
+                Navigator.pop(context); // Close dialog immediately[cite: 1]
                 await _createNewTeam(teamNameController.text.trim());
               }
             },
             child: const Text(
               'CREATE',
-              style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 1.2),
+              style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 1.5),
             ),
           ),
         ],
@@ -167,10 +183,15 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
   Future<void> _createNewTeam(String name) async {
     setState(() => _isLoading = true);
     try {
+      final authUser = await Amplify.Auth.getCurrentUser();
       final uniqueCode = _generateInviteCode();
 
-      // 1. Create the new Team
-      final newTeam = Team(name: name, inviteCode: uniqueCode);
+      // 1. Create the new Team with the creator assigned as the sole organizer
+      final newTeam = Team(
+        name: name,
+        inviteCode: uniqueCode,
+        organizerId: authUser.userId,
+      );
 
       final teamRequest = ModelMutations.create(newTeam);
       final teamResponse = await Amplify.API
@@ -185,7 +206,6 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
       }
 
       // 2. Fetch the creator's DynamoDB User profile
-      final authUser = await Amplify.Auth.getCurrentUser();
       final userRequest = ModelQueries.get(
         User.classType,
         UserModelIdentifier(id: authUser.userId),
@@ -196,14 +216,16 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
       final currentUser = userResponse.data;
 
       if (currentUser != null) {
-        // 3. Automatically generate a TeamMember record linking the creator to their new squad
+        // 3. Automatically add the organizer to the TeamMember roster
         final newMember = TeamMember(user: currentUser, team: createdTeam);
         final joinRequest = ModelMutations.create(newMember);
         await Amplify.API.mutate(request: joinRequest).response;
       }
 
-      safePrint('Team successfully created and joined with code: $uniqueCode');
-      await _fetchTeams(); // Refresh the filtered list
+      safePrint(
+        'Team created with organizer ${authUser.userId} and code: $uniqueCode',
+      );
+      await _fetchTeams();
     } on ApiException catch (e) {
       safePrint('Create Team failed: $e');
       setState(() => _isLoading = false);
@@ -218,6 +240,13 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: _crispWhite,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+        titlePadding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12.0),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 24.0,
+          vertical: 8.0,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 20.0),
         title: const Text(
           'JOIN SQUAD',
           style: TextStyle(

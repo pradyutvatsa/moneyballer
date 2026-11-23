@@ -31,42 +31,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _fetchGames() async {
     try {
       if (!mounted) return;
+      setState(() => _isLoading = true);
 
-      setState(() {
-        _isLoading = true;
-      });
+      final authUser = await Amplify.Auth.getCurrentUser();
 
-      final request = ModelQueries.list(Game.classType);
-      final response = await Amplify.API.query(request: request).response;
+      // 1. Fetch all TeamMember records for the current user
+      final memberRequest = ModelQueries.list(
+        TeamMember.classType,
+        where: TeamMember.USER.eq(authUser.userId),
+      );
+      final memberResponse = await Amplify.API
+          .query(request: memberRequest)
+          .response;
+      final myTeamIds =
+          memberResponse.data?.items
+              .whereType<TeamMember>()
+              .map((m) => m.team?.id)
+              .whereType<String>()
+              .toSet() ??
+          {};
 
-      if (response.hasErrors) {
-        safePrint('GraphQL Query errors: ${response.errors}');
-      }
+      // 2. Fetch Games and keep only those belonging to the user's squads
+      final gameRequest = ModelQueries.list(Game.classType);
+      final gameResponse = await Amplify.API
+          .query(request: gameRequest)
+          .response;
 
-      final items = response.data?.items;
+      final validGames =
+          gameResponse.data?.items
+              .whereType<Game>()
+              .where((g) => g.team != null && myTeamIds.contains(g.team!.id))
+              .toList() ??
+          [];
 
-      if (items != null) {
-        final fetchedGames = items.whereType<Game>().toList();
-
-        if (mounted) {
-          setState(() {
-            _games = List<Game>.from(fetchedGames);
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _games = [];
-            _isLoading = false;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _games = validGames;
+          _isLoading = false;
+        });
       }
     } on ApiException catch (e) {
-      safePrint('Query failed: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      safePrint('Fetch squad games failed: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

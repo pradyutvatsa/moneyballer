@@ -8,6 +8,7 @@ import 'package:moneyballer/models/ModelProvider.dart';
 import 'package:moneyballer/features/scheduling/financial_dashboard_screen.dart';
 import 'package:moneyballer/features/profile/contact_information_screen.dart';
 import 'package:moneyballer/features/profile/profile_and_account_screen.dart';
+import 'package:moneyballer/features/profile/my_squads_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -319,9 +320,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 _buildActionCard(
-                  title: 'Group Memberships',
+                  title: 'My Squads',
                   icon: Icons.group_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MySquadsScreen(),
+                      ),
+                    );
+                  },
                 ),
                 _buildActionCard(
                   title: 'Payments',
