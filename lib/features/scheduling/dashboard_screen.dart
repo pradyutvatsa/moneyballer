@@ -6,6 +6,12 @@ import 'package:moneyballer/models/ModelProvider.dart';
 import 'package:moneyballer/features/scheduling/create_game_screen.dart';
 import 'package:moneyballer/features/scheduling/event_details_screen.dart';
 
+import 'dart:convert';
+
+//import 'package:amplify_api/amplify_api.dart';
+//import 'package:amplify_flutter/amplify_flutter.dart';
+//import 'package:moneyballer/models/ModelProvider.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -43,6 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final memberResponse = await Amplify.API
           .query(request: memberRequest)
           .response;
+
       final myTeamIds =
           memberResponse.data?.items
               .whereType<TeamMember>()
@@ -51,18 +58,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
               .toSet() ??
           {};
 
-      // 2. Fetch Games and keep only those belonging to the user's squads
-      final gameRequest = ModelQueries.list(Game.classType);
+      // 2. Fetch Games including teamId so squad-scheduled games are never dropped
+      const String document = '''
+        query ListGamesWithTeam {
+          listGames {
+            items {
+              id
+              date
+              time
+              location
+              organizerId
+              maxPlayers
+              userFeeInput
+              appFee
+              minimumBalanceRequired
+              teamId
+            }
+          }
+        }
+      ''';
+
       final gameResponse = await Amplify.API
-          .query(request: gameRequest)
+          .query(request: GraphQLRequest<String>(document: document))
           .response;
 
-      final validGames =
-          gameResponse.data?.items
-              .whereType<Game>()
-              .where((g) => g.team != null && myTeamIds.contains(g.team!.id))
-              .toList() ??
-          [];
+      if (gameResponse.hasErrors) {
+        safePrint('ListGames errors: ${gameResponse.errors}');
+      }
+
+      final rawData = gameResponse.data;
+      final List<Game> validGames = [];
+
+      if (rawData != null) {
+        final Map<String, dynamic> decoded = jsonDecode(rawData);
+        final List items = decoded['listGames']?['items'] ?? [];
+
+        for (final item in items) {
+          if (item == null) continue;
+          final String? teamId = item['teamId'];
+
+          // Keep games belonging to one of the logged-in user's squads
+          if (teamId != null && myTeamIds.contains(teamId)) {
+            validGames.add(
+              Game(
+                id: item['id'],
+                date: TemporalDate.fromString(
+                  item['date'] ??
+                      DateTime.now().toIso8601String().split('T')[0],
+                ),
+                time: TemporalTime.fromString(item['time'] ?? '00:00:00.000Z'),
+                location: item['location'] ?? 'Unknown Location',
+                organizerId: item['organizerId'] ?? '',
+                maxPlayers: (item['maxPlayers'] as num?)?.toInt() ?? 10,
+                userFeeInput: (item['userFeeInput'] as num?)?.toDouble(),
+                appFee: (item['appFee'] as num?)?.toDouble(),
+                minimumBalanceRequired: (item['minimumBalanceRequired'] as num?)
+                    ?.toDouble(),
+              ),
+            );
+          }
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -70,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _isLoading = false;
         });
       }
-    } on ApiException catch (e) {
+    } catch (e) {
       safePrint('Fetch squad games failed: $e');
       if (mounted) setState(() => _isLoading = false);
     }

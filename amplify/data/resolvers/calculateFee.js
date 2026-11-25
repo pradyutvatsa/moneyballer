@@ -2,25 +2,59 @@
 import { util } from '@aws-appsync/utils';
 
 export function request(ctx) {
-    // 1. Intercept the incoming maxPlayers argument[cite: 1]
-    const maxPlayers = ctx.args.input.maxPlayers;
+    const {
+        date,
+        time,
+        location,
+        organizerId,
+        maxPlayers,
+        squadType,
+        userFeeInput,
+        teamId,
+    } = ctx.args;
 
-    // 2. Secure backend fee calculation[cite: 1]
-    const calculatedFee = maxPlayers <= 10 ? 1.99 : 2.99;
+    if (!maxPlayers || maxPlayers <= 0) {
+        util.error('maxPlayers must be greater than 0', 'ValidationException');
+    }
 
-    // 3. Inject the secure fee into the incoming mutation payload[cite: 1]
-    ctx.args.input.appFee = calculatedFee;
-    ctx.args.input.minimumBalanceRequired = calculatedFee;
+    // 1. Determine platform tier fee ($1.99 for <= 10 players, $2.99 for > 10 players)
+    const appTierFee = maxPlayers <= 10 ? 1.99 : 2.99;
 
-    // 4. Pass the modified payload through to AppSync's native DynamoDB PutItem resolver
+    // 2. Sanitize organizer's base fee input (only applicable for SOCIAL squads)
+    const baseUserFee =
+        squadType === 'SOCIAL' && typeof userFeeInput === 'number' && userFeeInput > 0
+            ? userFeeInput
+            : 0.0;
+
+    // 3. Compute authoritative per-player total fee:
+    //    userInput + (1.99 or 2.99) / maxPlayers
+    const rawTotalPerPlayer = baseUserFee + appTierFee / maxPlayers;
+    const computedTotalPerPlayer = Math.round(rawTotalPerPlayer * 100) / 100;
+
+    const now = util.time.nowISO8601();
+
+    const item = {
+        __typename: 'Game',
+        date,
+        time,
+        location,
+        organizerId,
+        maxPlayers,
+        userFeeInput: baseUserFee,
+        appFee: appTierFee,
+        minimumBalanceRequired: computedTotalPerPlayer,
+        createdAt: now,
+        updatedAt: now,
+    };
+
+    if (teamId) {
+        item.teamId = teamId;
+    }
+
     return {
         operation: 'PutItem',
         key: util.dynamodb.toMapValues({ id: util.autoId() }),
-        attributeValues: util.dynamodb.toMapValues(ctx.args.input),
-        condition: {
-            expression: 'attribute_not_exists(#id)',
-            expressionNames: { '#id': 'id' },
-        },
+        attributeValues: util.dynamodb.toMapValues(item),
     };
 }
 

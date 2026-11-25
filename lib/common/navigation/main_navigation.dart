@@ -12,31 +12,31 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  int _refreshCounter = 0; // <-- 1. Add this state variable here[cite: 1]
 
-  // Premium Color Palette
+  // Premium Color Palette[cite: 1]
   static const Color _crispWhite = Color(0xFFFAF7F2);
   static const Color _deepBlack = Color(0xFF0F0F0F);
   static const Color _champagneGold = Color(0xFFC2A878);
 
-  // The screens that correspond to each tab
-  final List<Widget> _screens = <Widget>[
-    DashboardScreen() as Widget,
-    RosterManagementScreen() as Widget, // Replaced 'Teams Screen Coming Soon'
-    const Center(
-      child: Text(
-        'Chats Screen Coming Soon',
-        style: TextStyle(color: _deepBlack, fontSize: 18),
-      ),
-    ),
-    ProfileScreen() as Widget,
-  ];
-
   @override
   Widget build(BuildContext context) {
+    // 2. Define _screens inside build() so DashboardScreen receives the updated ValueKey[cite: 1, 3]
+    final List<Widget> screens = [
+      DashboardScreen(key: ValueKey(_refreshCounter)),
+      const RosterManagementScreen(),
+      const Center(
+        child: Text(
+          'Chats Screen Coming Soon',
+          style: TextStyle(color: _deepBlack, fontSize: 18),
+        ),
+      ),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       backgroundColor: _crispWhite,
-      // IndexedStack preserves the state of your dashboard (like scroll position) when switching tabs
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           border: Border(
@@ -48,14 +48,17 @@ class _MainNavigationState extends State<MainNavigation> {
           onTap: (index) {
             setState(() {
               _currentIndex = index;
+              // 3. Increment _refreshCounter whenever the user taps HOME[cite: 1]
+              if (index == 0) {
+                _refreshCounter++;
+              }
             });
           },
           backgroundColor: _crispWhite,
           selectedItemColor: _champagneGold,
           unselectedItemColor: Colors.grey.shade400,
           showUnselectedLabels: true,
-          type:
-              BottomNavigationBarType.fixed, // Prevents the icons from shifting
+          type: BottomNavigationBarType.fixed,
           elevation: 0,
           selectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
@@ -88,7 +91,7 @@ class _MainNavigationState extends State<MainNavigation> {
                 padding: EdgeInsets.only(bottom: 6.0),
                 child: Icon(Icons.group, size: 24),
               ),
-              label: 'MySquads',
+              label: 'My Squads',
             ),
             BottomNavigationBarItem(
               icon: Padding(

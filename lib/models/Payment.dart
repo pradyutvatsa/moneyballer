@@ -30,6 +30,7 @@ class Payment extends amplify_core.Model {
   final double? _amount;
   final String? _type;
   final String? _status;
+  final String? _gameId;
   final User? _user;
   final amplify_core.TemporalDateTime? _createdAt;
   final amplify_core.TemporalDateTime? _updatedAt;
@@ -86,6 +87,10 @@ class Payment extends amplify_core.Model {
     }
   }
   
+  String? get gameId {
+    return _gameId;
+  }
+  
   User? get user {
     return _user;
   }
@@ -98,14 +103,15 @@ class Payment extends amplify_core.Model {
     return _updatedAt;
   }
   
-  const Payment._internal({required this.id, required amount, required type, required status, user, createdAt, updatedAt}): _amount = amount, _type = type, _status = status, _user = user, _createdAt = createdAt, _updatedAt = updatedAt;
+  const Payment._internal({required this.id, required amount, required type, required status, gameId, user, createdAt, updatedAt}): _amount = amount, _type = type, _status = status, _gameId = gameId, _user = user, _createdAt = createdAt, _updatedAt = updatedAt;
   
-  factory Payment({String? id, required double amount, required String type, required String status, User? user}) {
+  factory Payment({String? id, required double amount, required String type, required String status, String? gameId, User? user}) {
     return Payment._internal(
       id: id == null ? amplify_core.UUID.getUUID() : id,
       amount: amount,
       type: type,
       status: status,
+      gameId: gameId,
       user: user);
   }
   
@@ -121,6 +127,7 @@ class Payment extends amplify_core.Model {
       _amount == other._amount &&
       _type == other._type &&
       _status == other._status &&
+      _gameId == other._gameId &&
       _user == other._user;
   }
   
@@ -136,6 +143,7 @@ class Payment extends amplify_core.Model {
     buffer.write("amount=" + (_amount != null ? _amount!.toString() : "null") + ", ");
     buffer.write("type=" + "$_type" + ", ");
     buffer.write("status=" + "$_status" + ", ");
+    buffer.write("gameId=" + "$_gameId" + ", ");
     buffer.write("user=" + (_user != null ? _user!.toString() : "null") + ", ");
     buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
     buffer.write("updatedAt=" + (_updatedAt != null ? _updatedAt!.format() : "null"));
@@ -144,12 +152,13 @@ class Payment extends amplify_core.Model {
     return buffer.toString();
   }
   
-  Payment copyWith({double? amount, String? type, String? status, User? user}) {
+  Payment copyWith({double? amount, String? type, String? status, String? gameId, User? user}) {
     return Payment._internal(
       id: id,
       amount: amount ?? this.amount,
       type: type ?? this.type,
       status: status ?? this.status,
+      gameId: gameId ?? this.gameId,
       user: user ?? this.user);
   }
   
@@ -157,6 +166,7 @@ class Payment extends amplify_core.Model {
     ModelFieldValue<double>? amount,
     ModelFieldValue<String>? type,
     ModelFieldValue<String>? status,
+    ModelFieldValue<String?>? gameId,
     ModelFieldValue<User?>? user
   }) {
     return Payment._internal(
@@ -164,6 +174,7 @@ class Payment extends amplify_core.Model {
       amount: amount == null ? this.amount : amount.value,
       type: type == null ? this.type : type.value,
       status: status == null ? this.status : status.value,
+      gameId: gameId == null ? this.gameId : gameId.value,
       user: user == null ? this.user : user.value
     );
   }
@@ -173,6 +184,7 @@ class Payment extends amplify_core.Model {
       _amount = (json['amount'] as num?)?.toDouble(),
       _type = json['type'],
       _status = json['status'],
+      _gameId = json['gameId'],
       _user = json['user'] != null
         ? json['user']['serializedData'] != null
           ? User.fromJson(new Map<String, dynamic>.from(json['user']['serializedData']))
@@ -182,7 +194,7 @@ class Payment extends amplify_core.Model {
       _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
   
   Map<String, dynamic> toJson() => {
-    'id': id, 'amount': _amount, 'type': _type, 'status': _status, 'user': _user?.toJson(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+    'id': id, 'amount': _amount, 'type': _type, 'status': _status, 'gameId': _gameId, 'user': _user?.toJson(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
   };
   
   Map<String, Object?> toMap() => {
@@ -190,6 +202,7 @@ class Payment extends amplify_core.Model {
     'amount': _amount,
     'type': _type,
     'status': _status,
+    'gameId': _gameId,
     'user': _user,
     'createdAt': _createdAt,
     'updatedAt': _updatedAt
@@ -200,6 +213,7 @@ class Payment extends amplify_core.Model {
   static final AMOUNT = amplify_core.QueryField(fieldName: "amount");
   static final TYPE = amplify_core.QueryField(fieldName: "type");
   static final STATUS = amplify_core.QueryField(fieldName: "status");
+  static final GAMEID = amplify_core.QueryField(fieldName: "gameId");
   static final USER = amplify_core.QueryField(
     fieldName: "user",
     fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'User'));
@@ -235,6 +249,12 @@ class Payment extends amplify_core.Model {
     modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
       key: Payment.STATUS,
       isRequired: true,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Payment.GAMEID,
+      isRequired: false,
       ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
     ));
     

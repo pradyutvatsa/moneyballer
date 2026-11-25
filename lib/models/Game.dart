@@ -33,6 +33,7 @@ class Game extends amplify_core.Model {
   final String? _location;
   final String? _organizerId;
   final int? _maxPlayers;
+  final double? _userFeeInput;
   final double? _appFee;
   final double? _minimumBalanceRequired;
   final Team? _team;
@@ -118,30 +119,16 @@ class Game extends amplify_core.Model {
     }
   }
   
-  double get appFee {
-    try {
-      return _appFee!;
-    } catch(e) {
-      throw amplify_core.AmplifyCodeGenModelException(
-          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
-          recoverySuggestion:
-            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
-          underlyingException: e.toString()
-          );
-    }
+  double? get userFeeInput {
+    return _userFeeInput;
   }
   
-  double get minimumBalanceRequired {
-    try {
-      return _minimumBalanceRequired!;
-    } catch(e) {
-      throw amplify_core.AmplifyCodeGenModelException(
-          amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastExceptionMessage,
-          recoverySuggestion:
-            amplify_core.AmplifyExceptionMessages.codeGenRequiredFieldForceCastRecoverySuggestion,
-          underlyingException: e.toString()
-          );
-    }
+  double? get appFee {
+    return _appFee;
+  }
+  
+  double? get minimumBalanceRequired {
+    return _minimumBalanceRequired;
   }
   
   Team? get team {
@@ -160,9 +147,9 @@ class Game extends amplify_core.Model {
     return _updatedAt;
   }
   
-  const Game._internal({required this.id, required date, required time, required location, required organizerId, required maxPlayers, required appFee, required minimumBalanceRequired, team, rsvps, createdAt, updatedAt}): _date = date, _time = time, _location = location, _organizerId = organizerId, _maxPlayers = maxPlayers, _appFee = appFee, _minimumBalanceRequired = minimumBalanceRequired, _team = team, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
+  const Game._internal({required this.id, required date, required time, required location, required organizerId, required maxPlayers, userFeeInput, appFee, minimumBalanceRequired, team, rsvps, createdAt, updatedAt}): _date = date, _time = time, _location = location, _organizerId = organizerId, _maxPlayers = maxPlayers, _userFeeInput = userFeeInput, _appFee = appFee, _minimumBalanceRequired = minimumBalanceRequired, _team = team, _rsvps = rsvps, _createdAt = createdAt, _updatedAt = updatedAt;
   
-  factory Game({String? id, required amplify_core.TemporalDate date, required amplify_core.TemporalTime time, required String location, required String organizerId, required int maxPlayers, required double appFee, required double minimumBalanceRequired, Team? team, List<RSVP>? rsvps}) {
+  factory Game({String? id, required amplify_core.TemporalDate date, required amplify_core.TemporalTime time, required String location, required String organizerId, required int maxPlayers, double? userFeeInput, double? appFee, double? minimumBalanceRequired, Team? team, List<RSVP>? rsvps}) {
     return Game._internal(
       id: id == null ? amplify_core.UUID.getUUID() : id,
       date: date,
@@ -170,6 +157,7 @@ class Game extends amplify_core.Model {
       location: location,
       organizerId: organizerId,
       maxPlayers: maxPlayers,
+      userFeeInput: userFeeInput,
       appFee: appFee,
       minimumBalanceRequired: minimumBalanceRequired,
       team: team,
@@ -190,6 +178,7 @@ class Game extends amplify_core.Model {
       _location == other._location &&
       _organizerId == other._organizerId &&
       _maxPlayers == other._maxPlayers &&
+      _userFeeInput == other._userFeeInput &&
       _appFee == other._appFee &&
       _minimumBalanceRequired == other._minimumBalanceRequired &&
       _team == other._team &&
@@ -210,6 +199,7 @@ class Game extends amplify_core.Model {
     buffer.write("location=" + "$_location" + ", ");
     buffer.write("organizerId=" + "$_organizerId" + ", ");
     buffer.write("maxPlayers=" + (_maxPlayers != null ? _maxPlayers!.toString() : "null") + ", ");
+    buffer.write("userFeeInput=" + (_userFeeInput != null ? _userFeeInput!.toString() : "null") + ", ");
     buffer.write("appFee=" + (_appFee != null ? _appFee!.toString() : "null") + ", ");
     buffer.write("minimumBalanceRequired=" + (_minimumBalanceRequired != null ? _minimumBalanceRequired!.toString() : "null") + ", ");
     buffer.write("team=" + (_team != null ? _team!.toString() : "null") + ", ");
@@ -220,7 +210,7 @@ class Game extends amplify_core.Model {
     return buffer.toString();
   }
   
-  Game copyWith({amplify_core.TemporalDate? date, amplify_core.TemporalTime? time, String? location, String? organizerId, int? maxPlayers, double? appFee, double? minimumBalanceRequired, Team? team, List<RSVP>? rsvps}) {
+  Game copyWith({amplify_core.TemporalDate? date, amplify_core.TemporalTime? time, String? location, String? organizerId, int? maxPlayers, double? userFeeInput, double? appFee, double? minimumBalanceRequired, Team? team, List<RSVP>? rsvps}) {
     return Game._internal(
       id: id,
       date: date ?? this.date,
@@ -228,6 +218,7 @@ class Game extends amplify_core.Model {
       location: location ?? this.location,
       organizerId: organizerId ?? this.organizerId,
       maxPlayers: maxPlayers ?? this.maxPlayers,
+      userFeeInput: userFeeInput ?? this.userFeeInput,
       appFee: appFee ?? this.appFee,
       minimumBalanceRequired: minimumBalanceRequired ?? this.minimumBalanceRequired,
       team: team ?? this.team,
@@ -240,8 +231,9 @@ class Game extends amplify_core.Model {
     ModelFieldValue<String>? location,
     ModelFieldValue<String>? organizerId,
     ModelFieldValue<int>? maxPlayers,
-    ModelFieldValue<double>? appFee,
-    ModelFieldValue<double>? minimumBalanceRequired,
+    ModelFieldValue<double?>? userFeeInput,
+    ModelFieldValue<double?>? appFee,
+    ModelFieldValue<double?>? minimumBalanceRequired,
     ModelFieldValue<Team?>? team,
     ModelFieldValue<List<RSVP>?>? rsvps
   }) {
@@ -252,6 +244,7 @@ class Game extends amplify_core.Model {
       location: location == null ? this.location : location.value,
       organizerId: organizerId == null ? this.organizerId : organizerId.value,
       maxPlayers: maxPlayers == null ? this.maxPlayers : maxPlayers.value,
+      userFeeInput: userFeeInput == null ? this.userFeeInput : userFeeInput.value,
       appFee: appFee == null ? this.appFee : appFee.value,
       minimumBalanceRequired: minimumBalanceRequired == null ? this.minimumBalanceRequired : minimumBalanceRequired.value,
       team: team == null ? this.team : team.value,
@@ -266,6 +259,7 @@ class Game extends amplify_core.Model {
       _location = json['location'],
       _organizerId = json['organizerId'],
       _maxPlayers = (json['maxPlayers'] as num?)?.toInt(),
+      _userFeeInput = (json['userFeeInput'] as num?)?.toDouble(),
       _appFee = (json['appFee'] as num?)?.toDouble(),
       _minimumBalanceRequired = (json['minimumBalanceRequired'] as num?)?.toDouble(),
       _team = json['team'] != null
@@ -290,7 +284,7 @@ class Game extends amplify_core.Model {
       _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
   
   Map<String, dynamic> toJson() => {
-    'id': id, 'date': _date?.format(), 'time': _time?.format(), 'location': _location, 'organizerId': _organizerId, 'maxPlayers': _maxPlayers, 'appFee': _appFee, 'minimumBalanceRequired': _minimumBalanceRequired, 'team': _team?.toJson(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+    'id': id, 'date': _date?.format(), 'time': _time?.format(), 'location': _location, 'organizerId': _organizerId, 'maxPlayers': _maxPlayers, 'userFeeInput': _userFeeInput, 'appFee': _appFee, 'minimumBalanceRequired': _minimumBalanceRequired, 'team': _team?.toJson(), 'rsvps': _rsvps?.map((RSVP? e) => e?.toJson()).toList(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
   };
   
   Map<String, Object?> toMap() => {
@@ -300,6 +294,7 @@ class Game extends amplify_core.Model {
     'location': _location,
     'organizerId': _organizerId,
     'maxPlayers': _maxPlayers,
+    'userFeeInput': _userFeeInput,
     'appFee': _appFee,
     'minimumBalanceRequired': _minimumBalanceRequired,
     'team': _team,
@@ -315,6 +310,7 @@ class Game extends amplify_core.Model {
   static final LOCATION = amplify_core.QueryField(fieldName: "location");
   static final ORGANIZERID = amplify_core.QueryField(fieldName: "organizerId");
   static final MAXPLAYERS = amplify_core.QueryField(fieldName: "maxPlayers");
+  static final USERFEEINPUT = amplify_core.QueryField(fieldName: "userFeeInput");
   static final APPFEE = amplify_core.QueryField(fieldName: "appFee");
   static final MINIMUMBALANCEREQUIRED = amplify_core.QueryField(fieldName: "minimumBalanceRequired");
   static final TEAM = amplify_core.QueryField(
@@ -371,14 +367,20 @@ class Game extends amplify_core.Model {
     ));
     
     modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: Game.USERFEEINPUT,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
       key: Game.APPFEE,
-      isRequired: true,
+      isRequired: false,
       ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
     ));
     
     modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
       key: Game.MINIMUMBALANCEREQUIRED,
-      isRequired: true,
+      isRequired: false,
       ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
     ));
     

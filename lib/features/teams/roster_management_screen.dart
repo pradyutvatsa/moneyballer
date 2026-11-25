@@ -79,94 +79,262 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
 
   Future<void> _showCreateTeamDialog() async {
     final TextEditingController teamNameController = TextEditingController();
+    String?
+    selectedSquadType; // Starts unselected (null) every time the dialog opens
+    String? validationError;
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: _crispWhite,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
-        titlePadding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12.0),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 24.0,
-          vertical: 8.0,
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 20.0),
-        title: const Text(
-          'NEW TEAM',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: _champagneGold,
-            letterSpacing: 1.5,
-          ),
-        ),
-        content: TextField(
-          controller: teamNameController,
-          cursorColor: _champagneGold,
-          style: const TextStyle(
-            fontSize: 18,
-            color: _deepBlack,
-            fontWeight: FontWeight.w400,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Enter team name',
-            hintStyle: TextStyle(
-              color: Colors.grey.shade400,
-              fontWeight: FontWeight.w300,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final bool canSubmit =
+              teamNameController.text.trim().isNotEmpty &&
+              selectedSquadType != null;
+
+          return AlertDialog(
+            backgroundColor: _crispWhite,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
             ),
-            enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey, width: 0.5),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+            titlePadding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12.0),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 8.0,
             ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: _champagneGold, width: 1.5),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
-              ),
-            ),
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'CANCEL',
+            actionsPadding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 20.0),
+            title: const Text(
+              'NEW SQUAD',
               style: TextStyle(
-                color: Colors.grey,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 1.2,
+                color: _champagneGold,
+                letterSpacing: 1.5,
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _deepBlack,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-                vertical: 14.0,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: teamNameController,
+                  cursorColor: _champagneGold,
+                  onChanged: (_) => setDialogState(() {}),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: _deepBlack,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Enter squad name',
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontWeight: FontWeight.w300,
+                    ),
+                    enabledBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey, width: 0.5),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: _champagneGold, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Line 1: Social Squad Checkbox
+                InkWell(
+                  onTap: () => setDialogState(() {
+                    selectedSquadType = 'SOCIAL';
+                    validationError = null;
+                  }),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: selectedSquadType == 'SOCIAL',
+                          activeColor: _deepBlack,
+                          checkColor: Colors.white,
+                          side: const BorderSide(color: _deepBlack, width: 1.2),
+                          onChanged: (_) => setDialogState(() {
+                            selectedSquadType = 'SOCIAL';
+                            validationError = null;
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Social Squad',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
+                          color: _deepBlack,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Line 2: Invite Only Squad Checkbox
+                InkWell(
+                  onTap: () => setDialogState(() {
+                    selectedSquadType = 'INVITE_ONLY';
+                    validationError = null;
+                  }),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: selectedSquadType == 'INVITE_ONLY',
+                          activeColor: _deepBlack,
+                          checkColor: Colors.white,
+                          side: const BorderSide(color: _deepBlack, width: 1.2),
+                          onChanged: (_) => setDialogState(() {
+                            selectedSquadType = 'INVITE_ONLY';
+                            validationError = null;
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Invite Only Squad',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
+                          color: _deepBlack,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Helper prompt & tap tooltip directly below the checkboxes
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 14,
+                      color: selectedSquadType == null
+                          ? _champagneGold
+                          : Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Tooltip(
+                        message: 'Social Squad: Open to casual/public discovery. Invite Only Squad: Private roster accessible only via your squad code.',
+                        triggerMode: TooltipTriggerMode.tap,
+                        textStyle: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _deepBlack.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          selectedSquadType == null
+                              ? 'Select one squad type above to continue'
+                              : selectedSquadType == 'SOCIAL'
+                              ? 'Social Squad selected (tap for details)'
+                              : 'Invite Only Squad selected (tap for details)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: selectedSquadType == null
+                                ? Colors.grey.shade700
+                                : Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                if (validationError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    validationError!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            onPressed: () async {
-              if (teamNameController.text.trim().isNotEmpty) {
-                Navigator.pop(context); // Close dialog immediately[cite: 1]
-                await _createNewTeam(teamNameController.text.trim());
-              }
-            },
-            child: const Text(
-              'CREATE',
-              style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 1.5),
-            ),
-          ),
-        ],
+            actions: [
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 12.0,
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'CANCEL',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canSubmit
+                      ? _deepBlack
+                      : Colors.grey.shade400,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 14.0,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                onPressed: () async {
+                  if (teamNameController.text.trim().isEmpty) {
+                    setDialogState(() {
+                      validationError = 'Please enter a squad name.';
+                    });
+                    return;
+                  }
+                  if (selectedSquadType == null) {
+                    setDialogState(() {
+                      validationError =
+                          'Please select Social Squad or Invite Only Squad.';
+                    });
+                    return;
+                  }
+
+                  Navigator.pop(context);
+                  await _createNewTeam(
+                    teamNameController.text.trim(),
+                    squadType: selectedSquadType!,
+                  );
+                },
+                child: const Text(
+                  'CREATE',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -180,17 +348,20 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
     return 'SQUAD-$randomString';
   }
 
-  Future<void> _createNewTeam(String name) async {
+  Future<void> _createNewTeam(
+    String name, {
+    String squadType = 'SOCIAL',
+  }) async {
     setState(() => _isLoading = true);
     try {
       final authUser = await Amplify.Auth.getCurrentUser();
       final uniqueCode = _generateInviteCode();
 
-      // 1. Create the new Team with the creator assigned as the sole organizer
       final newTeam = Team(
         name: name,
         inviteCode: uniqueCode,
         organizerId: authUser.userId,
+        squadType: squadType,
       );
 
       final teamRequest = ModelMutations.create(newTeam);
@@ -205,7 +376,6 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
         return;
       }
 
-      // 2. Fetch the creator's DynamoDB User profile
       final userRequest = ModelQueries.get(
         User.classType,
         UserModelIdentifier(id: authUser.userId),
@@ -216,15 +386,11 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
       final currentUser = userResponse.data;
 
       if (currentUser != null) {
-        // 3. Automatically add the organizer to the TeamMember roster
         final newMember = TeamMember(user: currentUser, team: createdTeam);
         final joinRequest = ModelMutations.create(newMember);
         await Amplify.API.mutate(request: joinRequest).response;
       }
 
-      safePrint(
-        'Team created with organizer ${authUser.userId} and code: $uniqueCode',
-      );
       await _fetchTeams();
     } on ApiException catch (e) {
       safePrint('Create Team failed: $e');
@@ -400,7 +566,7 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
         elevation: 0,
         foregroundColor: _deepBlack,
         title: const Text(
-          'ROSTER MANAGEMENT',
+          'SQUAD MANAGEMENT',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w300,
@@ -430,7 +596,7 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
                 ),
                 children: [
                   const Text(
-                    'Your Teams',
+                    'Your Squads',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w400,
@@ -470,7 +636,7 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add, size: 24),
         label: const Text(
-          'New Team',
+          'New Squad',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -495,37 +661,20 @@ class _RosterManagementScreenState extends State<RosterManagementScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: Colors.grey.shade200,
-          ), // Subtle stroke instead of shadow[cite: 15]
+          border: Border.all(color: Colors.grey.shade200),
         ),
         padding: const EdgeInsets.all(24.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'TEAM ROSTER',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade500,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    team.name,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w400,
-                      color: _deepBlack,
-                    ),
-                  ),
-                ],
+              child: Text(
+                team.name,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w400,
+                  color: _deepBlack,
+                ),
               ),
             ),
             const Icon(

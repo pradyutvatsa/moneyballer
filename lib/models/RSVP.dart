@@ -28,6 +28,8 @@ class RSVP extends amplify_core.Model {
   static const classType = const _RSVPModelType();
   final String id;
   final String? _status;
+  final String? _paymentStatus;
+  final double? _paidAmount;
   final Game? _game;
   final User? _user;
   final amplify_core.TemporalDateTime? _createdAt;
@@ -59,6 +61,14 @@ class RSVP extends amplify_core.Model {
     }
   }
   
+  String? get paymentStatus {
+    return _paymentStatus;
+  }
+  
+  double? get paidAmount {
+    return _paidAmount;
+  }
+  
   Game? get game {
     return _game;
   }
@@ -75,12 +85,14 @@ class RSVP extends amplify_core.Model {
     return _updatedAt;
   }
   
-  const RSVP._internal({required this.id, required status, game, user, createdAt, updatedAt}): _status = status, _game = game, _user = user, _createdAt = createdAt, _updatedAt = updatedAt;
+  const RSVP._internal({required this.id, required status, paymentStatus, paidAmount, game, user, createdAt, updatedAt}): _status = status, _paymentStatus = paymentStatus, _paidAmount = paidAmount, _game = game, _user = user, _createdAt = createdAt, _updatedAt = updatedAt;
   
-  factory RSVP({String? id, required String status, Game? game, User? user}) {
+  factory RSVP({String? id, required String status, String? paymentStatus, double? paidAmount, Game? game, User? user}) {
     return RSVP._internal(
       id: id == null ? amplify_core.UUID.getUUID() : id,
       status: status,
+      paymentStatus: paymentStatus,
+      paidAmount: paidAmount,
       game: game,
       user: user);
   }
@@ -95,6 +107,8 @@ class RSVP extends amplify_core.Model {
     return other is RSVP &&
       id == other.id &&
       _status == other._status &&
+      _paymentStatus == other._paymentStatus &&
+      _paidAmount == other._paidAmount &&
       _game == other._game &&
       _user == other._user;
   }
@@ -109,6 +123,8 @@ class RSVP extends amplify_core.Model {
     buffer.write("RSVP {");
     buffer.write("id=" + "$id" + ", ");
     buffer.write("status=" + "$_status" + ", ");
+    buffer.write("paymentStatus=" + "$_paymentStatus" + ", ");
+    buffer.write("paidAmount=" + (_paidAmount != null ? _paidAmount!.toString() : "null") + ", ");
     buffer.write("game=" + (_game != null ? _game!.toString() : "null") + ", ");
     buffer.write("user=" + (_user != null ? _user!.toString() : "null") + ", ");
     buffer.write("createdAt=" + (_createdAt != null ? _createdAt!.format() : "null") + ", ");
@@ -118,22 +134,28 @@ class RSVP extends amplify_core.Model {
     return buffer.toString();
   }
   
-  RSVP copyWith({String? status, Game? game, User? user}) {
+  RSVP copyWith({String? status, String? paymentStatus, double? paidAmount, Game? game, User? user}) {
     return RSVP._internal(
       id: id,
       status: status ?? this.status,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paidAmount: paidAmount ?? this.paidAmount,
       game: game ?? this.game,
       user: user ?? this.user);
   }
   
   RSVP copyWithModelFieldValues({
     ModelFieldValue<String>? status,
+    ModelFieldValue<String?>? paymentStatus,
+    ModelFieldValue<double?>? paidAmount,
     ModelFieldValue<Game?>? game,
     ModelFieldValue<User?>? user
   }) {
     return RSVP._internal(
       id: id,
       status: status == null ? this.status : status.value,
+      paymentStatus: paymentStatus == null ? this.paymentStatus : paymentStatus.value,
+      paidAmount: paidAmount == null ? this.paidAmount : paidAmount.value,
       game: game == null ? this.game : game.value,
       user: user == null ? this.user : user.value
     );
@@ -142,6 +164,8 @@ class RSVP extends amplify_core.Model {
   RSVP.fromJson(Map<String, dynamic> json)  
     : id = json['id'],
       _status = json['status'],
+      _paymentStatus = json['paymentStatus'],
+      _paidAmount = (json['paidAmount'] as num?)?.toDouble(),
       _game = json['game'] != null
         ? json['game']['serializedData'] != null
           ? Game.fromJson(new Map<String, dynamic>.from(json['game']['serializedData']))
@@ -156,12 +180,14 @@ class RSVP extends amplify_core.Model {
       _updatedAt = json['updatedAt'] != null ? amplify_core.TemporalDateTime.fromString(json['updatedAt']) : null;
   
   Map<String, dynamic> toJson() => {
-    'id': id, 'status': _status, 'game': _game?.toJson(), 'user': _user?.toJson(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
+    'id': id, 'status': _status, 'paymentStatus': _paymentStatus, 'paidAmount': _paidAmount, 'game': _game?.toJson(), 'user': _user?.toJson(), 'createdAt': _createdAt?.format(), 'updatedAt': _updatedAt?.format()
   };
   
   Map<String, Object?> toMap() => {
     'id': id,
     'status': _status,
+    'paymentStatus': _paymentStatus,
+    'paidAmount': _paidAmount,
     'game': _game,
     'user': _user,
     'createdAt': _createdAt,
@@ -171,6 +197,8 @@ class RSVP extends amplify_core.Model {
   static final amplify_core.QueryModelIdentifier<RSVPModelIdentifier> MODEL_IDENTIFIER = amplify_core.QueryModelIdentifier<RSVPModelIdentifier>();
   static final ID = amplify_core.QueryField(fieldName: "id");
   static final STATUS = amplify_core.QueryField(fieldName: "status");
+  static final PAYMENTSTATUS = amplify_core.QueryField(fieldName: "paymentStatus");
+  static final PAIDAMOUNT = amplify_core.QueryField(fieldName: "paidAmount");
   static final GAME = amplify_core.QueryField(
     fieldName: "game",
     fieldType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.model, ofModelName: 'Game'));
@@ -198,6 +226,18 @@ class RSVP extends amplify_core.Model {
       key: RSVP.STATUS,
       isRequired: true,
       ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: RSVP.PAYMENTSTATUS,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.string)
+    ));
+    
+    modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.field(
+      key: RSVP.PAIDAMOUNT,
+      isRequired: false,
+      ofType: amplify_core.ModelFieldType(amplify_core.ModelFieldTypeEnum.double)
     ));
     
     modelSchemaDefinition.addField(amplify_core.ModelFieldDefinition.belongsTo(

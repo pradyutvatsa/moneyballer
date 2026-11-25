@@ -1,9 +1,9 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:amplify_api/amplify_api.dart';
+//import 'package:flutter/services.dart';
+//import 'package:share_plus/share_plus.dart';
+//import 'package:amplify_api/amplify_api.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:moneyballer/models/ModelProvider.dart';
-import 'package:flutter/services.dart'; // Add at top of team_details_screen.dart
 import 'package:moneyballer/features/scheduling/create_game_screen.dart';
 
 class TeamDetailsScreen extends StatefulWidget {
@@ -16,9 +16,7 @@ class TeamDetailsScreen extends StatefulWidget {
 }
 
 class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
-  List<TeamMember> _roster = [];
-  bool _isLoading = true;
-  String? _currentUserId; // Tracks logged-in user to verify organizer status
+  String? _currentUserId;
 
   // Premium Color Palette
   static const Color _crispWhite = Color(0xFFFAF7F2);
@@ -28,10 +26,13 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentUserAndRoster();
+    _loadCurrentUser();
   }
 
-  Future<void> _loadCurrentUserAndRoster() async {
+  bool get _isOrganizer =>
+      _currentUserId != null && _currentUserId == widget.team.organizerId;
+
+  Future<void> _loadCurrentUser() async {
     try {
       final authUser = await Amplify.Auth.getCurrentUser();
       if (mounted) {
@@ -39,351 +40,241 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
           _currentUserId = authUser.userId;
         });
       }
-    } on AuthException catch (e) {
-      safePrint('Auth fetch failed: $e');
-    }
-    await _fetchRoster();
-  }
-
-  Future<void> _fetchRoster() async {
-    try {
-      if (!mounted) return;
-      setState(() => _isLoading = true);
-
-      // Query using the relational .TEAM getter instead of the hidden .TEAMID
-      final request = ModelQueries.list(
-        TeamMember.classType,
-        where: TeamMember.TEAM.eq(widget.team.id),
-      );
-      final response = await Amplify.API.query(request: request).response;
-
-      if (response.hasErrors) {
-        safePrint('Roster Query errors: ${response.errors}');
-      }
-
-      final items = response.data?.items;
-      if (items != null) {
-        final fetchedMembers = items.whereType<TeamMember>().toList();
-        // Pin the squad organizer to the top of the roster
-        fetchedMembers.sort((a, b) {
-          final aIsOrg = a.user?.id == widget.team.organizerId;
-          final bIsOrg = b.user?.id == widget.team.organizerId;
-          if (aIsOrg && !bIsOrg) return -1;
-          if (!aIsOrg && bIsOrg) return 1;
-          return 0;
-        });
-        if (mounted) {
-          setState(() {
-            _roster = fetchedMembers;
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _roster = [];
-            _isLoading = false;
-          });
-        }
-      }
-    } on ApiException catch (e) {
-      safePrint('Fetch Roster failed: $e');
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      safePrint('Error fetching auth user: $e');
     }
   }
 
-  void _shareInviteCode() {
-    final code = widget.team.inviteCode ?? 'No code available';
-    final shareText =
-        'Join my squad "${widget.team.name}" on MoneyBaller! Use invite code: $code \n\nDownload the app to get started.';
+  // Empty dropdown modal sliding down from the top (40% of screen height)
+  void _showSquadDropdownModal() {
+    final double modalHeight = MediaQuery.of(context).size.height * 0.40;
 
-    SharePlus.instance.share(
-      ShareParams(
-        text: shareText,
-        subject: 'You are invited to join ${widget.team.name}!',
-      ),
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss squad dropdown',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Material(
+            color: _crispWhite,
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(
+              width: double.infinity,
+              height: modalHeight,
+              // Intentionally left empty for now
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+        final offsetAnimation =
+            Tween<Offset>(
+              begin: const Offset(0.0, -1.0),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            );
+
+        return SlideTransition(position: offsetAnimation, child: child);
+      },
     );
+  }
+
+  void _onTopRightPlusTapped() {
+    if (_isOrganizer) {
+      Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreateGameScreen(initialTeam: widget.team),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isOrganizer =
-        _currentUserId != null && _currentUserId == widget.team.organizerId;
+    final double bannerHeight = MediaQuery.of(context).size.height * 0.25;
 
-    return Scaffold(
-      backgroundColor: _crispWhite,
-      appBar: AppBar(
+    return DefaultTabController(
+      length: 5,
+      child: Scaffold(
         backgroundColor: _crispWhite,
-        elevation: 0,
-        foregroundColor: _deepBlack,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            size: 20,
-            color: _deepBlack,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          widget.team.name.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w300,
-            letterSpacing: 2.0,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _fetchRoster,
-        color: _champagneGold,
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+        body: Column(
           children: [
-            // Compact Invite Code Card — Visible ONLY to the Squad Organizer
-            if (isOrganizer) ...[
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: _champagneGold.withValues(alpha: 0.4),
-                    width: 1.0,
+            // 1. Full-bleed Top Image Banner (25% of screen height, zero side margins)
+            SizedBox(
+              width: double.infinity,
+              height: bannerHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Squad Banner Background (Replace with Image.network when S3 squad images are added)
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: _deepBlack,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFF1C1C1C), Color(0xFF0F0F0F)],
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.shield_outlined,
+                        size: 56,
+                        color: _champagneGold.withValues(alpha: 0.25),
+                      ),
+                    ),
                   ),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14.0,
-                  horizontal: 18.0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'INVITE CODE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: _champagneGold,
-                              letterSpacing: 1.5,
+
+                  // Top Controls Overlay (Back button, Centered Squad Name, Bold + Button)
+                  SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 4.0,
+                      ),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Back navigation button
+                            IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                              onPressed: () => Navigator.of(context).pop(),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.team.inviteCode ?? 'PENDING',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w400,
-                              color: _deepBlack,
-                              letterSpacing: 2.0,
+
+                            // 2. Top-Center Squad Name (Tappable for empty dropdown modal)
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _showSquadDropdownModal,
+                                behavior: HitTestBehavior.opaque,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        widget.team.name.toUpperCase(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.white,
+                                          letterSpacing: 2.0,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.keyboard_arrow_down,
+                                      size: 20,
+                                      color: _champagneGold,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+
+                            // 3. Top-Right Action Button denoted by bold '+' icon
+                            IconButton(
+                              onPressed: _onTopRightPlusTapped,
+                              tooltip: 'Add',
+                              icon: const Icon(
+                                Icons.add,
+                                size: 28,
+                                weight: 800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _deepBlack,
-                        side: const BorderSide(color: _deepBlack, width: 1.0),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8.0,
-                          horizontal: 12.0,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      onPressed: _shareInviteCode,
-                      icon: const Icon(Icons.ios_share, size: 14),
-                      label: const Text(
-                        'SHARE',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-            ],
-            const Text(
-              'Active Roster',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w400,
-                color: _deepBlack,
-                letterSpacing: 1.2,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
 
-            // Dynamic Roster Rendering
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 24.0),
-                child: Center(
-                  child: CircularProgressIndicator(color: _champagneGold),
+            // 4. Navigation Bar directly underneath the squad image
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade300, width: 0.8),
                 ),
-              )
-            else if (_roster.isEmpty)
-              const Text(
-                'No players have joined yet.',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w300,
-                  color: Colors.grey,
-                  height: 1.5,
-                ),
-              )
-            else
-              for (final member in _roster) _buildPlayerCard(member),
-          ],
-        ),
-      ),
-      floatingActionButton: isOrganizer
-          ? FloatingActionButton.extended(
-              heroTag: null,
-              onPressed: () async {
-                final created = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        CreateGameScreen(initialTeam: widget.team),
-                  ),
-                );
-                if (created == true) {
-                  _fetchRoster();
-                }
-              },
-              backgroundColor: _deepBlack,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.event_available, size: 20),
-              label: const Text(
-                'Schedule Game',
-                style: TextStyle(
-                  fontSize: 14,
+              ),
+              child: const TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                indicatorColor: _champagneGold,
+                indicatorWeight: 2.5,
+                labelColor: _deepBlack,
+                unselectedLabelColor: Colors.grey,
+                labelPadding: EdgeInsets.symmetric(horizontal: 18.0),
+                labelStyle: TextStyle(
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.2,
                 ),
+                unselectedLabelStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 1.2,
+                ),
+                tabs: [
+                  Tab(text: 'EVENTS'),
+                  Tab(text: 'POSTS'),
+                  Tab(text: 'PAYMENTS'),
+                  Tab(text: 'POLLS'),
+                  Tab(text: 'FILES'),
+                ],
               ),
-            )
-          : null,
+            ),
+
+            // Tab Views Body
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _buildPlaceholderTab('Events'),
+                  _buildPlaceholderTab('Posts'),
+                  _buildPlaceholderTab('Payments'),
+                  _buildPlaceholderTab('Polls'),
+                  _buildPlaceholderTab('Files'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildPlayerCard(TeamMember member) {
-    final playerName = member.user?.name ?? 'Player (Syncing)';
-    final initial = playerName.isNotEmpty ? playerName[0].toUpperCase() : '?';
-    final payId = member.user?.payId;
-    final payIdType = member.user?.payIdType;
-    final hasPayId = payId != null && payId.isNotEmpty;
-    final isSquadOrganizer =
-        member.user?.id != null && member.user!.id == widget.team.organizerId;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: _deepBlack,
-            foregroundColor: Colors.white,
-            radius: 20,
-            child: Text(
-              initial,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        playerName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w400,
-                          color: _deepBlack,
-                        ),
-                      ),
-                    ),
-                    if (isSquadOrganizer) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _champagneGold.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: _champagneGold, width: 0.8),
-                        ),
-                        child: const Text(
-                          'ORGANISER',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: _champagneGold,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hasPayId
-                      ? 'PayID (${payIdType ?? 'AU'}): $payId'
-                      : 'PayID not set',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: hasPayId ? _champagneGold : Colors.grey.shade500,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (hasPayId)
-            IconButton(
-              icon: const Icon(
-                Icons.copy_outlined,
-                size: 18,
-                color: _deepBlack,
-              ),
-              tooltip: 'Copy PayID',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: payId));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Copied $playerName\'s PayID: $payId'),
-                    backgroundColor: _deepBlack,
-                  ),
-                );
-              },
-            ),
-        ],
+  Widget _buildPlaceholderTab(String tabName) {
+    return Center(
+      child: Text(
+        '$tabName coming soon',
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w300,
+          color: Colors.grey,
+          letterSpacing: 1.0,
+        ),
       ),
     );
   }

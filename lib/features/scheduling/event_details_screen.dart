@@ -13,6 +13,16 @@ class EventDetailsScreen extends StatelessWidget {
   static const Color _deepBlack = Color(0xFF0F0F0F);
   static const Color _champagneGold = Color(0xFFC2A878);
 
+  // Computes the per-player fee safely from backend-stored values
+  double get _playerShare {
+    final double minBalance = game.minimumBalanceRequired ?? 0.0;
+    if (minBalance > 0) {
+      return minBalance;
+    }
+    if (game.maxPlayers <= 0) return 0.0;
+    return (game.appFee ?? 0.0) / game.maxPlayers;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,13 +76,17 @@ class EventDetailsScreen extends StatelessWidget {
           _buildInfoRow(Icons.calendar_today_outlined, game.date.format()),
           _buildInfoRow(Icons.access_time, game.time.format().substring(0, 5)),
           _buildInfoRow(Icons.location_on_outlined, game.location),
+          _buildInfoRow(
+            Icons.payments_outlined,
+            'Fee per player: \$${_playerShare.toStringAsFixed(2)} AUD',
+          ),
 
           const SizedBox(height: 24),
           const Divider(color: Colors.grey, thickness: 0.5, height: 60),
 
-          Text(
+          const Text(
             'RSVP STATUS',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: _champagneGold,
@@ -95,10 +109,8 @@ class EventDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () async {
-                    // 1. Calculate player's equal share of the upfront fee
-                    final double playerShare = game.maxPlayers > 0
-                        ? (game.appFee) / game.maxPlayers
-                        : 0.0;
+                    // 1. Read the computed per-player fee from the getter
+                    final double playerShare = _playerShare;
 
                     try {
                       // 2. Fetch authenticated Cognito User
@@ -126,7 +138,7 @@ class EventDetailsScreen extends StatelessWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Insufficient funds. Please top up \$$playerShare to RSVP.',
+                                'Insufficient funds. Please top up \$${playerShare.toStringAsFixed(2)} to RSVP.',
                               ),
                               backgroundColor: Colors.red,
                             ),
@@ -201,7 +213,7 @@ class EventDetailsScreen extends StatelessWidget {
                         safePrint('RSVP errors: ${rsvpResponse.errors}');
                       } else {
                         safePrint(
-                          'Successfully RSVPd and \$$playerShare deducted!',
+                          'Successfully RSVPd and \$${playerShare.toStringAsFixed(2)} deducted!',
                         );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
